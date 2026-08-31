@@ -2,18 +2,13 @@
 
 A macOS menu bar app that keeps your **Claude** and **Codex** rate-limit usage on screen at all times.
 
-```
-┌──────────────────────────────┐
-│ ✳ Claude                 Pro │
-│ 5-hour  ▓▓░░░░░░  47%  4h 7m │
-│ Weekly  ▓▓▓▓▓░░░  57%  2d19h │
-│ ⊛ Codex             Pro Lite │
-│ Weekly  ▓▓░░░░░░  23%  6d15h │
-│ Web                        ⟳ │
-└──────────────────────────────┘
-```
+<img src="docs/overlay.png" width="290" alt="The overlay panel: Claude at 63% of its 5-hour limit and 59% weekly, Codex at 25% weekly.">
 
-The same icons and your highest usage per provider also appear in the menu bar (`✳ 57%  ⊛ 23%`).
+Each row is one rate-limit window, with how much is used and when it resets. The footer shows where the numbers came from and how fresh they are, plus a refresh button.
+
+Your highest usage per provider also sits in the menu bar:
+
+<img src="docs/menubar.png" width="100" alt="Menu bar showing the Claude icon at 63% and the OpenAI icon at 25%.">
 
 ---
 
@@ -118,6 +113,8 @@ To confirm the Chrome integration is working, look at the bottom-left of the ove
 ---
 
 ## Menu bar
+
+Clicking the menu bar item opens:
 
 | Item | What it does |
 |---|---|
