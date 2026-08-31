@@ -26,7 +26,8 @@ struct ProviderUsage: Equatable {
     var updatedAt: Date?
     var note: String?
 
-    var peak: Double? { gauges.map(\.percent).max() }
+    /// 가장 빡빡한 창의 남은 비율. 화면에는 사용량이 아니라 남은 양을 보여 준다.
+    var lowestRemaining: Double? { gauges.map { 100 - $0.percent }.min() }
 }
 
 struct Snapshot: Equatable {
