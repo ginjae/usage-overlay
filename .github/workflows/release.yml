@@ -1,0 +1,40 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Build universal app bundle
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          APP_VERSION="$version" BUILD_NUMBER="$GITHUB_RUN_NUMBER" ./scripts/bundle.sh --universal
+
+      - name: Create release archive and checksum
+        run: |
+          archive="Usage-Overlay-${GITHUB_REF_NAME}.zip"
+          ditto -c -k --sequesterRsrc --keepParent "build/Usage Overlay.app" "build/$archive"
+          cd build
+          shasum -a 256 "$archive" > "$archive.sha256"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            "build/Usage-Overlay-${GITHUB_REF_NAME}.zip" \
+            "build/Usage-Overlay-${GITHUB_REF_NAME}.zip.sha256" \
+            --verify-tag \
+            --generate-notes

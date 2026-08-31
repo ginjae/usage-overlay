@@ -63,7 +63,7 @@ Anything else is ignored, so unknown codename fields are filtered out and one so
 
 - macOS 14 or later
 - Google Chrome, signed in to both claude.ai and chatgpt.com
-- Xcode command line tools (Swift 6) to build
+- Xcode Command Line Tools (Swift 6) **only if you build from source**
 
 ### Permissions the app needs
 
@@ -103,12 +103,41 @@ The app never writes to either location.
 
 ## Install
 
+### Download the app (recommended)
+
+Download `Usage-Overlay-v*.zip` from the [latest GitHub Release](https://github.com/ginjae/usage-overlay/releases/latest), unzip it, and move **Usage Overlay.app** to `/Applications`.
+
+The release is a Universal app, so it runs natively on both Apple Silicon and Intel Macs. It only links macOS system frameworks; Swift, Xcode, Homebrew, and other build dependencies are not required on the destination Mac.
+
+Releases are currently ad-hoc signed, not Apple-notarized. On first launch, macOS may block the app because it cannot verify the developer. After trying to open it once, go to **System Settings → Privacy & Security → Security → Open Anyway**. A future Developer ID-signed and notarized release would remove this extra step.
+
+### Build from source
+
+Install Apple's Xcode Command Line Tools if needed:
+
+```bash
+xcode-select --install
+```
+
+Then clone the repository and build the app:
+
 ```bash
 ./scripts/bundle.sh              # release build → build/Usage Overlay.app (ad-hoc signed)
 open "build/Usage Overlay.app"
 ```
 
-For everyday use, move `build/Usage Overlay.app` to `/Applications` and turn on **Launch at Login** from the menu.
+Pass `--universal` to build for both Apple Silicon and Intel instead of only the current Mac. Release builds also accept `APP_VERSION=1.2.3` and `BUILD_NUMBER=123`.
+
+For everyday use, move `build/Usage Overlay.app` to `/Applications` and turn on **Launch at Login** from the menu. If the required Apple build tools are missing, the script now stops with an installation hint instead of an opaque compiler error.
+
+Maintainers can publish a prebuilt release by pushing a three-part version tag. For example:
+
+```bash
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+GitHub Actions builds the Universal app, creates a zip and SHA-256 checksum, and attaches both to a new GitHub Release.
 
 To confirm the Chrome integration is working, look at the bottom-left of the overlay: `Web` means it's live, `Local` means it fell back to the CLI cache.
 
