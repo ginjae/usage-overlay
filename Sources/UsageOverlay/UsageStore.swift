@@ -33,6 +33,9 @@ final class UsageStore: ObservableObject {
     }
 
     func refresh() {
+        // 이제 한 번의 갱신이 응답을 기다리느라 몇 초 걸릴 수 있다.
+        // 그 사이 타이머가 또 부르면 요청이 쌓이므로 진행 중이면 건너뛴다.
+        guard !isRefreshing else { return }
         secondsSinceRefresh = 0
         isRefreshing = true
         queue.async { [weak self] in

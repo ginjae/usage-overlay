@@ -2,13 +2,15 @@
 
 A macOS menu bar app that keeps your **Claude** and **Codex** rate-limit usage on screen at all times.
 
-<img src="docs/overlay.png" width="290" alt="The overlay panel: Claude at 63% of its 5-hour limit and 59% weekly, Codex at 25% weekly.">
+<img src="docs/overlay.png" width="290" alt="The overlay panel showing how much of each Claude and Codex rate-limit window is left.">
 
-Each row is one rate-limit window, with how much is used and when it resets. The footer shows where the numbers came from and how fresh they are, plus a refresh button.
+Each row is one rate-limit window: **how much of it is left**, and when it resets. Percentages count down, not up — 39% means you have 39% of that window still available. The bar drains and turns amber below 50%, red below 20%.
 
-Your highest usage per provider also sits in the menu bar:
+The footer shows where the numbers came from and how fresh they are, plus a refresh button.
 
-<img src="docs/menubar.png" width="100" alt="Menu bar showing the Claude icon at 63% and the OpenAI icon at 25%.">
+Your tightest remaining headroom per provider also sits in the menu bar:
+
+<img src="docs/menubar.png" width="100" alt="Menu bar showing the Claude and OpenAI icons with the remaining percentage next to each.">
 
 ---
 
@@ -154,7 +156,7 @@ defaults write io.github.ginjae.usage-overlay url.codex  'https://chatgpt.com/#s
 
 - The Chrome JavaScript setting must be enabled by hand, and it survives restarts but not a profile reset.
 - Because the usage windows are hidden, you can't see a sign-in prompt if a session expires. Turn off **Hide Chrome Window** to bring it back.
-- API responses are asynchronous, so a value lands one poll after it's requested.
+- A refresh waits up to 6 seconds per provider for the response, so it isn't instant.
 - If an endpoint changes, the app falls back to `Local` silently. The badge switching to `Local` is the only signal.
 - Screen capture tools will include the overlay.
 - Chrome tab ids do not compare equal to integer literals in AppleScript — `(id of t) as text` gives the same digits, but `(id of t) is 1546029274` is false. Every tab lookup compares strings. This cost hours; it's noted here so it doesn't again.

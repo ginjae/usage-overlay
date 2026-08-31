@@ -33,6 +33,9 @@ final class BrowserReader {
     /// 조회가 깨지면 폴링마다 창이 새로 열려 크롬이 난장판이 된다.
     /// 어떤 버그가 나더라도 창은 분당 하나를 넘지 않도록 막아 둔다.
     private let tabCreationCooldown: TimeInterval = 60
+    /// 응답을 기다리는 한계와 확인 간격.
+    private let responseTimeout: TimeInterval = 6
+    private let pollStep: TimeInterval = 0.4
 
     init(site: Site) {
         self.site = site
@@ -57,20 +60,35 @@ final class BrowserReader {
             return nil  // 방금 연 탭은 아직 로딩 중이다
         }
 
-        let script = PageScript.poll(resolver: site.resolver, hash: site.hash)
-        guard let raw = ChromeBridge.evaluate(script, in: found.tab),
-              let data = raw.data(using: .utf8),
-              let payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else { return nil }
-
-        return interpret(payload)
+        return fetchUsage(in: found.tab)
     }
 
-    /// fetch가 비동기라 첫 폴링은 요청만 띄우고 끝난다. 값은 다음 폴링에서 잡힌다.
-    private func interpret(_ payload: [String: Any]) -> ProviderUsage? {
-        guard let result = payload["result"],
-              let at = Parse.double(payload["resultAt"]), at > 0 else { return nil }
+    /// 요청을 띄운 뒤 그 요청의 응답이 들어올 때까지 짧게 기다렸다가 읽는다.
+    /// 기다리지 않으면 직전 주기의 값을 읽게 되어 화면이 한 주기 낡는다.
+    private func fetchUsage(in tab: ChromeBridge.Tab) -> ProviderUsage? {
+        let script = PageScript.request(resolver: site.resolver, hash: site.hash)
+        guard let raw = ChromeBridge.evaluate(script, in: tab),
+              let requestedAt = Double(raw.trimmingCharacters(in: .whitespacesAndNewlines))
+        else { return nil }
 
+        let deadline = Date().addingTimeInterval(responseTimeout)
+        while Date() < deadline {
+            Thread.sleep(forTimeInterval: pollStep)
+            guard let raw = ChromeBridge.evaluate(PageScript.readState, in: tab),
+                  let data = raw.data(using: .utf8),
+                  let state = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            else { continue }
+
+            if let errAt = Parse.double(state["errAt"]), errAt >= requestedAt { return nil }
+            if let at = Parse.double(state["resultAt"]), at >= requestedAt {
+                return interpret(state, at: at)
+            }
+        }
+        return nil
+    }
+
+    private func interpret(_ state: [String: Any], at milliseconds: Double) -> ProviderUsage? {
+        guard let result = state["result"] else { return nil }
         let gauges = UsageScan.normalize(UsageScan.scan(result))
         guard !gauges.isEmpty else { return nil }
 
@@ -78,7 +96,7 @@ final class BrowserReader {
                              gauges: gauges,
                              plan: UsageScan.plan(in: result),
                              source: .browser,
-                             updatedAt: Date(timeIntervalSince1970: at / 1000),
+                             updatedAt: Date(timeIntervalSince1970: milliseconds / 1000),
                              note: nil)
     }
 

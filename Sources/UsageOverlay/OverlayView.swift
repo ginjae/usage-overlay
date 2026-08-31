@@ -121,13 +121,16 @@ private struct GaugeRow: View {
     @Environment(\.now) private var now
     let gauge: Gauge
 
-    private var fraction: Double { min(max(gauge.percent / 100, 0), 1) }
+    /// API는 "쓴 양"을 주지만 화면에는 "남은 양"을 보여 준다.
+    /// 모델은 원본 의미를 그대로 두고 표시 단계에서만 뒤집는다.
+    private var remaining: Double { max(0, 100 - gauge.percent) }
+    private var fraction: Double { min(max(remaining / 100, 0), 1) }
 
     private var color: Color {
-        switch gauge.percent {
-        case ..<50: return Color(red: 0.30, green: 0.78, blue: 0.47)
-        case ..<80: return Color(red: 0.95, green: 0.72, blue: 0.25)
-        default: return Color(red: 0.94, green: 0.38, blue: 0.34)
+        switch remaining {
+        case ..<20: return Color(red: 0.94, green: 0.38, blue: 0.34)
+        case ..<50: return Color(red: 0.95, green: 0.72, blue: 0.25)
+        default: return Color(red: 0.30, green: 0.78, blue: 0.47)
         }
     }
 
@@ -140,11 +143,11 @@ private struct GaugeRow: View {
 
             ZStack(alignment: .leading) {
                 Capsule().fill(Color.primary.opacity(0.12))
-                Capsule().fill(color).frame(width: max(2, 72 * fraction))
+                Capsule().fill(color).frame(width: 72 * fraction)
             }
             .frame(width: 72, height: 5)
 
-            Text("\(Int(gauge.percent.rounded()))%")
+            Text("\(Int(remaining.rounded()))%")
                 .font(.system(size: 10, weight: .medium).monospacedDigit())
                 .frame(width: 32, alignment: .trailing)
 

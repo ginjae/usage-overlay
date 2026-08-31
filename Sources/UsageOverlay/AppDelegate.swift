@@ -34,11 +34,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         store.start()
     }
 
-    /// 메뉴바에는 각 공급자의 최대 사용률만 짧게. 예) 버스트 54%  노트 21%
+    /// 메뉴바에는 각 공급자에게 가장 적게 남은 비율만 짧게. 예) 버스트 41%  노트 75%
     private func updateStatusTitle(_ snapshot: Snapshot) {
         var parts: [(NSImage, String)] = []
-        if let peak = snapshot.claude?.peak { parts.append((Icons.claude, "\(Int(peak.rounded()))%")) }
-        if let peak = snapshot.codex?.peak { parts.append((Icons.codex, "\(Int(peak.rounded()))%")) }
+        if let left = snapshot.claude?.lowestRemaining { parts.append((Icons.claude, "\(Int(left.rounded()))%")) }
+        if let left = snapshot.codex?.lowestRemaining { parts.append((Icons.codex, "\(Int(left.rounded()))%")) }
         statusItem.button?.image = StatusBarImage.make(parts)
     }
 

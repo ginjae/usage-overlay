@@ -51,23 +51,39 @@ enum PageScript {
     }
     """
 
-    /// fetch는 비동기라 이번 호출에서 띄우고 값은 다음 폴링에서 읽힌다.
-    static func poll(resolver: String, hash: String) -> String {
+    /// 사용량 요청을 띄우고, 이번 요청을 식별할 시각(ms)을 돌려준다.
+    ///
+    /// `fetch` 가 비동기라 요청과 읽기를 나눠야 한다. 한 번의 호출로 "요청을 띄우고
+    /// 지금 저장된 값을 반환"하면 화면 값이 늘 한 주기 뒤처진다 — 10초 주기에서는
+    /// 눈에 띄지 않지만 10분 주기에서는 10분 낡은 값이 보인다.
+    static func request(resolver: String, hash: String) -> String {
         """
         (function () {
           var S = window.__uo;
-          if (!S) S = window.__uo = { endpoint: null, result: null, resultAt: 0, err: null, uuid: null, token: null };
+          if (!S) S = window.__uo = { endpoint: null, result: null, resultAt: 0,
+                                      err: null, errAt: 0, uuid: null, token: null };
           try { if ('\(hash)' && location.hash !== '\(hash)') location.hash = '\(hash)'; } catch (e) {}
+          var mark = Date.now();
+          var fail = function (e) { S.err = String(e && e.message ? e.message : e); S.errAt = Date.now(); };
           try {
             var pending = (\(resolver))(S);
             if (pending && pending.then) {
-              pending.then(function (j) { S.result = j; S.resultAt = Date.now(); S.err = null; },
-                           function (e) { S.err = String(e && e.message ? e.message : e); });
+              pending.then(function (j) { S.result = j; S.resultAt = Date.now(); S.err = null; }, fail);
+            } else {
+              fail('resolver did not return a promise');
             }
-          } catch (e) { S.err = String(e && e.message ? e.message : e); }
-          return JSON.stringify({ href: location.href, ready: document.readyState, endpoint: S.endpoint,
-                                  resultAt: S.resultAt, err: S.err, result: S.result });
+          } catch (e) { fail(e); }
+          return String(mark);
         })()
         """
     }
+
+    /// 저장된 결과만 읽는다. 새 요청을 띄우지 않는다.
+    static let readState = """
+    (function () {
+      var S = window.__uo;
+      if (!S) return JSON.stringify({ resultAt: 0, errAt: 0 });
+      return JSON.stringify({ resultAt: S.resultAt, errAt: S.errAt, err: S.err, result: S.result });
+    })()
+    """
 }
