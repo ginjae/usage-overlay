@@ -11,6 +11,11 @@ import Foundation
 ///                                                 `window_minutes`, `resets_at`
 enum UsageScan {
     /// 알려진 키 → (표시 이름, 정렬용 창 길이(분))
+    ///
+    /// `primary` / `secondary` 는 일부러 넣지 않는다. 이름이 창 길이를 뜻하지 않기 때문이다 —
+    /// Pro 요금제 CLI 기록에서는 `primary` 가 5시간이고 `secondary` 가 주간인데,
+    /// 웹 응답의 `primary_window` 는 주간이다. 창 길이는 항상 응답에 함께 오므로
+    /// 그 값으로만 라벨을 정한다.
     private static let keyLabels: [String: (String, Double?)] = [
         "five_hour": ("5-hour", 300),
         "session": ("5-hour", 300),
@@ -20,10 +25,6 @@ enum UsageScan {
         "weekly_opus": ("Opus", 10080),
         "seven_day_sonnet": ("Sonnet", 10080),
         "weekly_sonnet": ("Sonnet", 10080),
-        "primary": ("Weekly", nil),
-        "secondary": ("5-hour", nil),
-        "primary_window": ("Weekly", nil),
-        "secondary_window": ("5-hour", nil),
     ]
 
     /// 들어가지 않을 가지. 모델별 부가 한도나 크레딧까지 게이지로 잡히면 오버레이가 지저분해진다.
