@@ -76,7 +76,16 @@ enum Format {
         return "\(m)m"
     }
 
-    /// 마지막 갱신 시점을 "3m ago" 형태로.
+    /// 마지막 갱신 시점을 "just now" / "3m ago" 형태로. 늘 떠 있는 자리라 초 단위로 떨지 않게 한다.
+    static func since(_ date: Date, from now: Date) -> String {
+        let s = max(0, Int(now.timeIntervalSince(date)))
+        if s < 60 { return "just now" }
+        if s < 3600 { return "\(s / 60)m ago" }
+        if s < 86400 { return "\(s / 3600)h ago" }
+        return "\(s / 86400)d ago"
+    }
+
+    /// 갱신이 늦어졌을 때만 알리는 판. 툴팁처럼 평소엔 조용해야 하는 자리에 쓴다.
     static func age(_ date: Date?, from now: Date) -> String? {
         guard let date else { return nil }
         let s = Int(now.timeIntervalSince(date))

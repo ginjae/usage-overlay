@@ -6,7 +6,7 @@ A macOS menu bar app that keeps your **Claude** and **Codex** rate-limit usage o
 
 Each row is one rate-limit window: **how much of it is left**, and when it resets. Percentages count down, not up — 39% means you have 39% of that window still available. The bar drains and turns amber below 50%, red below 20%.
 
-The footer shows where the numbers came from and how fresh they are, plus a refresh button.
+The footer shows the age of the numbers once they go stale, plus a refresh button. Where each provider's numbers came from is in the menu bar tooltip.
 
 Your tightest remaining headroom per provider also sits in the menu bar, tagged with the window it came from — `5h 39%` means 39% of the 5-hour window is left, `7d 62%` means the weekly one:
 
@@ -20,7 +20,7 @@ Which window it follows, which providers appear, and how much detail is shown ar
 
 The app never talks to Anthropic or OpenAI itself. It gets numbers from two places, in order.
 
-### 1. Chrome (shown as `Web`)
+### 1. Chrome (reported as `Web`)
 
 It opens a **dedicated, hidden Chrome window** holding two tabs, and runs JavaScript inside them via AppleScript. The JavaScript calls each site's own usage API using the session you are **already logged into** — no API keys, no tokens to configure.
 
@@ -38,7 +38,7 @@ These are undocumented endpoints, found by observing what the pages actually req
 
 **Why not scrape the page?** An earlier version read percentages off the rendered page and got them wrong — it read a promo banner ("weekly limit is **50%** higher") as 50% usage, and ChatGPT's "**80%** remaining" as 80% used. Showing a wrong number is worse than showing a stale one, so DOM scraping was removed entirely.
 
-### 2. Local CLI cache (shown as `Local`)
+### 2. Local CLI cache (reported as `Local`)
 
 If Chrome is closed or the integration is blocked, the app falls back to files the two CLIs already write:
 
@@ -47,7 +47,7 @@ If Chrome is closed or the integration is blocked, the app falls back to files t
 | Claude | `~/.claude.json` | `cachedUsageUtilization` |
 | Codex | `~/.codex/sessions/**/rollout-*.jsonl` | last `token_count` event → `rate_limits` |
 
-These are values the CLIs cached from their own last request, so they go stale if you haven't used the CLI recently. When that happens the plan name is replaced by the age of the data (`3m ago`).
+These are values the CLIs cached from their own last request, so they go stale if you haven't used the CLI recently. When that happens the overlay footer shows how old the numbers are (`3m ago`).
 
 ### Parsing
 
@@ -143,7 +143,7 @@ git push origin v0.2.0
 
 GitHub Actions builds the Universal app, creates a zip and SHA-256 checksum, and attaches both to a new GitHub Release.
 
-To confirm the Chrome integration is working, look at the bottom-left of the overlay: `Web` means it's live, `Local` means it fell back to the CLI cache.
+To confirm the Chrome integration is working, hover the menu bar item: the tooltip names each provider's source — `Web` means it's live, `Local` means it fell back to the CLI cache. The overlay itself stays out of it, since one badge for two providers can't say which is which.
 
 ---
 
@@ -206,7 +206,7 @@ defaults write io.github.ginjae.usage-overlay url.codex  'https://chatgpt.com/#s
 - The Chrome JavaScript setting must be enabled by hand, and it survives restarts but not a profile reset.
 - Because the usage windows are hidden, you can't see a sign-in prompt if a session expires. Turn off **Hide Chrome Window** to bring it back.
 - A refresh waits up to 6 seconds per provider for the response, so it isn't instant.
-- If an endpoint changes, the app falls back to `Local` silently. The badge switching to `Local` is the only signal.
+- If an endpoint changes, the app falls back to `Local` silently. The tooltip switching to `Local` is the only signal.
 - Screen capture tools will include the overlay.
 - Chrome tab ids do not compare equal to integer literals in AppleScript — `(id of t) as text` gives the same digits, but `(id of t) is 1546029274` is false. Every tab lookup compares strings. This cost hours; it's noted here so it doesn't again.
 

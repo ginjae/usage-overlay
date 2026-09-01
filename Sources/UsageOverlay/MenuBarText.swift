@@ -102,8 +102,9 @@ enum MenuBarText {
     }
 
     private static func rows(_ usage: ProviderUsage, now: Date) -> [String] {
-        guard !usage.gauges.isEmpty else { return ["  " + (usage.note ?? "No data yet")] }
-        return usage.gauges.map { gauge in
+        let note = usage.note.map { ["  " + $0] } ?? []
+        guard !usage.gauges.isEmpty else { return note.isEmpty ? ["  No data yet"] : note }
+        return note + usage.gauges.map { gauge in
             var row = "  \(gauge.label) · \(Int(max(0, 100 - gauge.percent).rounded()))% left"
             let reset = Format.remaining(until: gauge.resetsAt, from: now)
             if gauge.resetsAt != nil {
