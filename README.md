@@ -8,9 +8,11 @@ Each row is one rate-limit window: **how much of it is left**, and when it reset
 
 The footer shows where the numbers came from and how fresh they are, plus a refresh button.
 
-Your tightest remaining headroom per provider also sits in the menu bar:
+Your tightest remaining headroom per provider also sits in the menu bar, tagged with the window it came from — `5h 39%` means 39% of the 5-hour window is left, `7d 62%` means the weekly one:
 
 <img src="docs/menubar.png" width="100" alt="Menu bar showing the Claude and OpenAI icons with the remaining percentage next to each.">
+
+Which window it follows, which providers appear, and how much detail is shown are all configurable — see [Menu bar](#menu-bar). Hovering the item lists **every** window of both providers with plan, source and reset time, whatever the menu bar itself is set to.
 
 ---
 
@@ -128,6 +130,8 @@ open "build/Usage Overlay.app"
 
 Pass `--universal` to build for both Apple Silicon and Intel instead of only the current Mac. Release builds also accept `APP_VERSION=1.2.3` and `BUILD_NUMBER=123`.
 
+The app icon is generated during bundling: `sips` and `iconutil` slice `Resources/AppIcon.png` into every size macOS asks for. Replace that one 1024×1024 PNG to change the icon; `Resources/AppIcon-source.png` is the original artwork it was cut from, kept so the icon can be re-cropped later. If either tool is missing the build still finishes, just with the generic icon.
+
 For everyday use, move `build/Usage Overlay.app` to `/Applications` and turn on **Launch at Login** from the menu. If the required Apple build tools are missing, the script now stops with an installation hint instead of an opaque compiler error.
 
 Maintainers can publish a prebuilt release by pushing a three-part version tag. For example:
@@ -153,12 +157,28 @@ Clicking the menu bar item opens:
 | **Click Through** | Let mouse events pass to the window underneath (you can't drag the overlay while this is on, so position it first) |
 | **Opacity** | 100 / 85 / 70 / 50% |
 | **Refresh Interval** | 5s / 10s / 30s / 1 min / 10 min |
+| **Menu Bar** | What the status item itself shows — see below |
 | **Read from Chrome** | Turn off to use only the local CLI cache |
 | **Hide Chrome Window** | Turn **off** when you need to see the window — for example to sign in again |
 | **Reopen Usage Tabs** | Close and recreate the tracked tabs if they get into a bad state |
 | **Refresh Now** / **Reset Position** / **Launch at Login** / **Quit** | |
 
 The overlay is dragged by its background, floats above other windows on every Space including full screen, and remembers its position by top-left corner.
+
+### Menu Bar submenu
+
+| Option | What it does |
+|---|---|
+| **Show Claude** / **Show Codex** | Which providers appear. Turn one off if you only use the other, or to save width |
+| **Tightest Window** | Follow whichever window has the least left — the default, and why the number can jump between windows |
+| **5-hour Window** / **Weekly Window** | Pin one window instead. A provider that doesn't report it falls back to its tightest, so the item never goes blank |
+| **All Windows** | Every window of every provider, with the icon on the first one only |
+| **Percent Left** / **Percent Used** | Count down (default, matching the overlay) or up |
+| **Window Label** | Prefix the window length: `5h 39%` instead of `39%` |
+| **Provider Icon** | The Claude / OpenAI mark before each provider |
+| **Reset Time** | Append the countdown: `5h 39% · 2h 10m` |
+
+Turning both providers off leaves a plain `Usage` label, so the menu is still reachable. The tooltip ignores all of these and always shows everything.
 
 ---
 
@@ -204,5 +224,8 @@ defaults write io.github.ginjae.usage-overlay url.codex  'https://chatgpt.com/#s
 | `UsageStore.swift` | 1-second clock, N-second refresh, Web→Local fallback, plan-name backfill |
 | `OverlayPanel.swift` / `OverlayView.swift` | The floating HUD |
 | `AppDelegate.swift` | Menu bar item and menu |
+| `MenuBarText.swift` | Turns a snapshot into the menu bar text and tooltip, per the Menu Bar settings |
 | `Icons.swift` | Provider icons as embedded template images |
+| `Resources/AppIcon.png` | 1024px app icon master — the artwork cropped to its body and masked to the macOS icon shape, with the transparent margins the Dock expects. `bundle.sh` turns it into `AppIcon.icns` at build time |
+| `Resources/AppIcon-source.png` | The original square artwork, before cropping and masking |
 | `StatusBarImage.swift` | Composites icon + percentage into one menu bar image |

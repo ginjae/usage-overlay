@@ -60,6 +60,7 @@ fi
 
 SWIFT="$(xcrun --find swift)"
 CODESIGN="$(xcrun --find codesign 2>/dev/null)" || die "codesign was not found. Install the Xcode Command Line Tools with: xcode-select --install"
+ICON_SRC="Resources/AppIcon.png"
 
 if ! SWIFT_VERSION_OUTPUT="$("$SWIFT" --version 2>&1)"; then
   printf '%s\n' "$SWIFT_VERSION_OUTPUT" >&2
@@ -128,9 +129,36 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>NSAppleEventsUsageDescription</key>
   <string>사용량 페이지를 열어 두고 새로고침하기 위해 Google Chrome을 제어합니다.</string>
   <key>NSHighResolutionCapable</key><true/>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
 </dict>
 </plist>
 PLIST
+
+# 1024px 마스터 하나로 아이콘 세트를 만든다. 커밋해 두는 건 PNG 하나뿐.
+# 아이콘이 없어도 앱은 돌아가므로 여기서 빌드를 세우지는 않는다.
+if [[ -f "$ICON_SRC" ]] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
+  ICONSET="$(mktemp -d)/AppIcon.iconset"
+  mkdir -p "$ICONSET" "$APP/Contents/Resources"
+  while read -r size name; do
+    [[ -n "$size" ]] || continue
+    sips -z "$size" "$size" "$ICON_SRC" --out "$ICONSET/$name.png" >/dev/null
+  done <<'SIZES'
+16 icon_16x16
+32 icon_16x16@2x
+32 icon_32x32
+64 icon_32x32@2x
+128 icon_128x128
+256 icon_128x128@2x
+256 icon_256x256
+512 icon_256x256@2x
+512 icon_512x512
+1024 icon_512x512@2x
+SIZES
+  iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
+  rm -rf "$(dirname "$ICONSET")"
+else
+  printf 'warning: %s 로 아이콘을 만들지 못했습니다. 앱은 기본 아이콘으로 빌드됩니다.\n' "$ICON_SRC" >&2
+fi
 
 "$CODESIGN" --force --sign - "$APP" >/dev/null
 "$CODESIGN" --verify --deep --strict "$APP"
