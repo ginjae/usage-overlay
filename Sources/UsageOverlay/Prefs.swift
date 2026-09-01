@@ -13,6 +13,13 @@ enum Prefs {
             Key.opacity: 1.0,
             Key.browserEnabled: true,
             Key.hideWindow: true,
+            Key.menuBarClaude: true,
+            Key.menuBarCodex: true,
+            Key.menuBarWindow: MenuBarWindow.tightest.rawValue,
+            Key.menuBarValue: MenuBarValue.remaining.rawValue,
+            Key.menuBarLabel: true,
+            Key.menuBarIcon: true,
+            Key.menuBarReset: false,
         ])
     }
 
@@ -25,6 +32,55 @@ enum Prefs {
         static let topLeftY = "topLeftY"
         static let browserEnabled = "browserEnabled"
         static let hideWindow = "hideWindow"
+        static let menuBarClaude = "menuBarClaude"
+        static let menuBarCodex = "menuBarCodex"
+        static let menuBarWindow = "menuBarWindow"
+        static let menuBarValue = "menuBarValue"
+        static let menuBarLabel = "menuBarLabel"
+        static let menuBarIcon = "menuBarIcon"
+        static let menuBarReset = "menuBarReset"
+    }
+
+    // MARK: - 메뉴바 표시
+
+    /// 메뉴바에 공급자를 넣을지. 하나만 쓰는 사람은 반대쪽을 꺼서 폭을 줄인다.
+    static var menuBarClaude: Bool {
+        get { defaults.bool(forKey: Key.menuBarClaude) }
+        set { defaults.set(newValue, forKey: Key.menuBarClaude) }
+    }
+
+    static var menuBarCodex: Bool {
+        get { defaults.bool(forKey: Key.menuBarCodex) }
+        set { defaults.set(newValue, forKey: Key.menuBarCodex) }
+    }
+
+    /// 어떤 한도 창의 숫자를 메뉴바에 띄울지.
+    static var menuBarWindow: MenuBarWindow {
+        get { defaults.string(forKey: Key.menuBarWindow).flatMap(MenuBarWindow.init(rawValue:)) ?? .tightest }
+        set { defaults.set(newValue.rawValue, forKey: Key.menuBarWindow) }
+    }
+
+    /// 퍼센트를 남은 양으로 볼지 쓴 양으로 볼지.
+    static var menuBarValue: MenuBarValue {
+        get { defaults.string(forKey: Key.menuBarValue).flatMap(MenuBarValue.init(rawValue:)) ?? .remaining }
+        set { defaults.set(newValue.rawValue, forKey: Key.menuBarValue) }
+    }
+
+    /// 숫자 앞에 창 이름을 붙일지. 예) `5h 39%`
+    static var menuBarLabel: Bool {
+        get { defaults.bool(forKey: Key.menuBarLabel) }
+        set { defaults.set(newValue, forKey: Key.menuBarLabel) }
+    }
+
+    static var menuBarIcon: Bool {
+        get { defaults.bool(forKey: Key.menuBarIcon) }
+        set { defaults.set(newValue, forKey: Key.menuBarIcon) }
+    }
+
+    /// 남은 시간까지 붙일지. 예) `5h 39% · 2h 10m`
+    static var menuBarReset: Bool {
+        get { defaults.bool(forKey: Key.menuBarReset) }
+        set { defaults.set(newValue, forKey: Key.menuBarReset) }
     }
 
     /// 크롬에서 값을 가져올지. 끄면 로컬 캐시 파일만 읽는다.

@@ -8,6 +8,17 @@ struct Gauge: Identifiable, Equatable {
     let resetsAt: Date?
     /// 한도 창의 길이(분). 정렬에만 쓰며 모를 수 있다.
     var windowMinutes: Double?
+
+    /// 메뉴바용 짧은 라벨. 폭이 곧 다른 앱의 자리라 창 길이만 남긴다. "5-hour" → "5h".
+    var shortLabel: String {
+        switch label {
+        case "5-hour": return "5h"
+        case "Daily": return "1d"
+        case "Weekly": return "7d"
+        case "Monthly": return "30d"
+        default: return label
+        }
+    }
 }
 
 /// 한 공급자(Claude / Codex)의 사용량 스냅샷.

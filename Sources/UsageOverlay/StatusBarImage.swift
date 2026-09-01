@@ -12,21 +12,24 @@ enum StatusBarImage {
     private static let groupGap: CGFloat = 7
     private static let font = NSFont.monospacedDigitSystemFont(ofSize: 11.5, weight: .regular)
 
-    static func make(_ parts: [(icon: NSImage, text: String)]) -> NSImage {
-        let parts = parts.isEmpty ? [(Icons.claude, "–"), (Icons.codex, "–")] : parts
+    static func make(_ parts: [MenuBarPart]) -> NSImage {
+        let parts = parts.isEmpty ? [MenuBarPart(icon: nil, text: "–")] : parts
         let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.black]
 
-        let widths = parts.map { (part: (icon: NSImage, text: String)) -> CGFloat in
-            iconSize + iconTextGap + (part.text as NSString).size(withAttributes: attributes).width
+        let widths = parts.map { part -> CGFloat in
+            let text = (part.text as NSString).size(withAttributes: attributes).width
+            return part.icon == nil ? text : iconSize + iconTextGap + text
         }
         let total = widths.reduce(0, +) + groupGap * CGFloat(parts.count - 1)
 
-        let image = NSImage(size: NSSize(width: ceil(total), height: height), flipped: false) { _ in
+        let image = NSImage(size: NSSize(width: max(1, ceil(total)), height: height), flipped: false) { _ in
             var x: CGFloat = 0
             for part in parts {
-                part.icon.draw(in: NSRect(x: x, y: (height - iconSize) / 2,
-                                          width: iconSize, height: iconSize))
-                x += iconSize + iconTextGap
+                if let icon = part.icon {
+                    icon.draw(in: NSRect(x: x, y: (height - iconSize) / 2,
+                                         width: iconSize, height: iconSize))
+                    x += iconSize + iconTextGap
+                }
                 let text = part.text as NSString
                 let size = text.size(withAttributes: attributes)
                 text.draw(at: NSPoint(x: x, y: (height - size.height) / 2), withAttributes: attributes)
