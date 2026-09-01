@@ -32,6 +32,14 @@ final class UsageStore: ObservableObject {
         }
     }
 
+    /// 웹 읽기가 실패해 로컬로 떨어졌다면 그 이유를 달아 둔다. 메뉴바 툴팁에서 보인다.
+    private static func annotate(_ usage: ProviderUsage, webFailure: String?) -> ProviderUsage {
+        guard let webFailure else { return usage }
+        var usage = usage
+        usage.note = [usage.note, "Chrome: \(webFailure)"].compactMap { $0 }.joined(separator: " · ")
+        return usage
+    }
+
     func refresh() {
         // 이제 한 번의 갱신이 응답을 기다리느라 몇 초 걸릴 수 있다.
         // 그 사이 타이머가 또 부르면 요청이 쌓이므로 진행 중이면 건너뛴다.
@@ -44,8 +52,10 @@ final class UsageStore: ObservableObject {
             let useBrowser = Prefs.browserEnabled && ChromeBridge.isRunning && ChromeBridge.javaScriptEnabled()
             let localClaude = ClaudeReader.read()
             let localCodex = self.codexReader.read()
-            var claude = (useBrowser ? self.claudeBrowser.read() : nil) ?? localClaude
-            var codex = (useBrowser ? self.codexBrowser.read() : nil) ?? localCodex
+            var claude = (useBrowser ? self.claudeBrowser.read() : nil)
+                ?? localClaude.map { Self.annotate($0, webFailure: useBrowser ? self.claudeBrowser.lastFailure : nil) }
+            var codex = (useBrowser ? self.codexBrowser.read() : nil)
+                ?? localCodex.map { Self.annotate($0, webFailure: useBrowser ? self.codexBrowser.lastFailure : nil) }
             // claude.ai 사용량 응답에는 플랜 이름이 없어 로컬 캐시에서 채워 넣는다.
             if claude?.plan == nil { claude?.plan = localClaude?.plan }
             if codex?.plan == nil { codex?.plan = localCodex?.plan }

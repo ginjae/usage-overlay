@@ -18,15 +18,19 @@ enum PageScript {
         return fetch(S.endpoint, { credentials: 'include', headers: { accept: 'application/json' } })
           .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
       };
-      if (S.uuid) return usage(S.uuid);
-      return fetch('/api/organizations', { credentials: 'include', headers: { accept: 'application/json' } })
-        .then(function (r) { if (!r.ok) throw new Error('organizations HTTP ' + r.status); return r.json(); })
-        .then(function (list) {
-          var org = (list && list.length) ? list[0] : null;
-          if (!org || !org.uuid) throw new Error('No organization found (sign in required)');
-          S.uuid = org.uuid;
-          return usage(S.uuid);
-        });
+      var resolve = function () {
+        return fetch('/api/organizations', { credentials: 'include', headers: { accept: 'application/json' } })
+          .then(function (r) { if (!r.ok) throw new Error('organizations HTTP ' + r.status); return r.json(); })
+          .then(function (list) {
+            var org = (list && list.length) ? list[0] : null;
+            if (!org || !org.uuid) throw new Error('No organization found (sign in required)');
+            S.uuid = org.uuid;
+            return usage(S.uuid);
+          });
+      };
+      /* 캐시해 둔 값이 거부되면 버리고 한 번만 다시 푼다. 안 그러면 탭을 새로 열 때까지 계속 실패한다. */
+      if (S.uuid) return usage(S.uuid).catch(function (e) { S.uuid = null; return resolve(); });
+      return resolve();
     }
     """
 
@@ -40,14 +44,19 @@ enum PageScript {
         return fetch(S.endpoint, { credentials: 'include', headers: headers })
           .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
       };
-      if (S.token) return usage(S.token);
-      return fetch('/api/auth/session', { credentials: 'include' })
-        .then(function (r) { if (!r.ok) throw new Error('session HTTP ' + r.status); return r.json(); })
-        .then(function (j) {
-          if (!j || !j.accessToken) throw new Error('No session token (sign in required)');
-          S.token = j.accessToken;
-          return usage(S.token);
-        });
+      var resolve = function () {
+        return fetch('/api/auth/session', { credentials: 'include' })
+          .then(function (r) { if (!r.ok) throw new Error('session HTTP ' + r.status); return r.json(); })
+          .then(function (j) {
+            if (!j || !j.accessToken) throw new Error('No session token (sign in required)');
+            S.token = j.accessToken;
+            return usage(S.token);
+          });
+      };
+      /* 세션 토큰은 만료된다. 한 번 받아 두고 계속 쓰면 그 뒤로는 영영 401이라 로컬 캐시로만 떨어진다.
+         거부당하면 버리고 새로 받아 한 번 재시도한다. */
+      if (S.token) return usage(S.token).catch(function (e) { S.token = null; return resolve(); });
+      return resolve();
     }
     """
 

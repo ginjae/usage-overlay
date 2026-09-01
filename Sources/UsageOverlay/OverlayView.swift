@@ -32,7 +32,7 @@ struct OverlayView: View {
 
     private var footer: some View {
         HStack(spacing: 4) {
-            Text(sourceSummary)
+            Text(freshness)
                 .font(.system(size: 9))
                 .foregroundStyle(.tertiary)
             Spacer(minLength: 4)
@@ -54,16 +54,13 @@ struct OverlayView: View {
         .padding(.top, -2)
     }
 
-    /// 어디서 온 값인지와, 오래됐으면 얼마나 오래됐는지.
-    private var sourceSummary: String {
+    /// 값이 언제 것인지 늘 띄운다. 조용하면 멈춘 건지 최신인 건지 알 수 없다.
+    /// 어디서 온 값인지(Web/Local)는 여기 두면 어느 공급자 것인지 알 수 없어 메뉴바 툴팁에만 둔다.
+    private var freshness: String {
         let providers = [store.snapshot.claude, store.snapshot.codex].compactMap { $0 }
         guard !providers.isEmpty else { return "Loading…" }
-        var text = Set(providers.map(\.source.rawValue)).sorted().joined(separator: "·")
-        if let oldest = providers.compactMap(\.updatedAt).min(),
-           let age = Format.age(oldest, from: store.now) {
-            text += " · \(age)"
-        }
-        return text
+        guard let oldest = providers.compactMap(\.updatedAt).min() else { return "Updated —" }
+        return "Updated " + Format.since(oldest, from: store.now)
     }
 }
 
