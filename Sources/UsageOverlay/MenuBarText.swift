@@ -96,7 +96,6 @@ enum MenuBarText {
     private static func header(_ usage: ProviderUsage, now: Date) -> String {
         var header = usage.name
         if let plan = usage.plan { header += " · \(plan)" }
-        header += " · \(usage.source.rawValue)"
         if let age = Format.age(usage.updatedAt, from: now) { header += " · \(age)" }
         return header
     }

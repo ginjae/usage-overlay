@@ -5,9 +5,22 @@ struct Gauge: Identifiable, Equatable {
     let id: String
     let label: String
     let percent: Double
-    let resetsAt: Date?
+    var resetsAt: Date?
     /// 한도 창의 길이(분). 정렬에만 쓰며 모를 수 있다.
     var windowMinutes: Double?
+
+    /// 창 길이(분)로 정하는 표시 이름. 응답마다 창 이름이 달라 길이만 믿는다.
+    static func label(forMinutes minutes: Double) -> String {
+        switch Int(minutes) {
+        case 300: return "5-hour"
+        case 1440: return "Daily"
+        case 10080: return "Weekly"
+        case 43200: return "Monthly"
+        case let m where m >= 1440: return "\(m / 1440)d"
+        case let m where m >= 60: return "\(m / 60)h"
+        default: return "\(Int(minutes))m"
+        }
+    }
 
     /// 메뉴바용 짧은 라벨. 폭이 곧 다른 앱의 자리라 창 길이만 남긴다. "5-hour" → "5h".
     var shortLabel: String {
@@ -22,18 +35,11 @@ struct Gauge: Identifiable, Equatable {
 }
 
 /// 한 공급자(Claude / Codex)의 사용량 스냅샷.
-/// 값을 어디서 가져왔는지. 신선도와 신뢰도가 달라 UI에 표시한다.
-enum UsageSource: String, Equatable {
-    case browser = "Web"
-    case localCache = "Local"
-}
-
 struct ProviderUsage: Equatable {
     var name: String
     var gauges: [Gauge]
     var plan: String?
-    var source: UsageSource = .localCache
-    /// 원본 데이터가 마지막으로 갱신된 시각. CLI가 떠 있지 않으면 오래된 값일 수 있다.
+    /// 값을 받아 온 시각. CLI가 대답을 못 하면 직전 값이 남으므로 나이를 표시한다.
     var updatedAt: Date?
     var note: String?
 
@@ -44,24 +50,6 @@ struct ProviderUsage: Equatable {
 struct Snapshot: Equatable {
     var claude: ProviderUsage?
     var codex: ProviderUsage?
-}
-
-enum Parse {
-    /// ISO8601 문자열(소수점 6자리 포함) 또는 epoch 초를 Date로.
-    static func date(_ any: Any?) -> Date? {
-        if let n = any as? NSNumber { return Date(timeIntervalSince1970: n.doubleValue) }
-        guard var s = any as? String, !s.isEmpty else { return nil }
-        // "…:00.208150+00:00" 의 소수부를 떼어낸다. ISO8601DateFormatter가 6자리를 못 읽는다.
-        if let dot = s.firstIndex(of: "."),
-           let end = s[s.index(after: dot)...].firstIndex(where: { !$0.isNumber }) {
-            s.removeSubrange(dot..<end)
-        }
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime]
-        return f.date(from: s)
-    }
-
-    static func double(_ any: Any?) -> Double? { (any as? NSNumber)?.doubleValue }
 }
 
 enum Format {

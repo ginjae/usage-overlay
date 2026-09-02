@@ -6,100 +6,102 @@ A macOS menu bar app that keeps your **Claude** and **Codex** rate-limit usage o
 
 Each row is one rate-limit window: **how much of it is left**, and when it resets. Percentages count down, not up — 39% means you have 39% of that window still available. The bar drains and turns amber below 50%, red below 20%.
 
-The footer shows the age of the numbers once they go stale, plus a refresh button. Where each provider's numbers came from is in the menu bar tooltip.
+The footer shows the age of the numbers once they go stale, plus a refresh button.
 
 Your tightest remaining headroom per provider also sits in the menu bar, tagged with the window it came from — `5h 39%` means 39% of the 5-hour window is left, `7d 62%` means the weekly one:
 
 <img src="docs/menubar.png" width="100" alt="Menu bar showing the Claude and OpenAI icons with the remaining percentage next to each.">
 
-Which window it follows, which providers appear, and how much detail is shown are all configurable — see [Menu bar](#menu-bar). Hovering the item lists **every** window of both providers with plan, source and reset time, whatever the menu bar itself is set to.
+Which window it follows, which providers appear, and how much detail is shown are all configurable — see [Menu bar](#menu-bar). Hovering the item lists **every** window of both providers with plan and reset time, whatever the menu bar itself is set to.
 
 ---
 
 ## How it works
 
-The app never talks to Anthropic or OpenAI itself. It gets numbers from two places, in order.
+The app never talks to Anthropic or OpenAI itself. It runs the two CLIs you already have and reads what they print.
 
-### 1. Chrome (reported as `Web`)
+### Claude — `claude -p "/usage"`
 
-It opens a **dedicated, hidden Chrome window** holding two tabs, and runs JavaScript inside them via AppleScript. The JavaScript calls each site's own usage API using the session you are **already logged into** — no API keys, no tokens to configure.
+`/usage` is the same command you would type inside a Claude Code session, run non-interactively. It is a built-in command rather than a model turn: `--output-format json` reports `num_turns: 0`, `total_cost_usd: 0`, and zero tokens either way. **Checking your usage never spends any of it.**
 
-| | Tab | API called from inside the tab |
-|---|---|---|
-| Claude | `https://claude.ai/new#settings/usage` | `GET /api/organizations` → uuid → `GET /api/organizations/{uuid}/usage` |
-| Codex | `https://chatgpt.com/sites#settings/Usage` | `GET /api/auth/session` → accessToken → `GET /backend-api/codex/usage` |
+What comes back is the text you would see in the TUI:
 
-- claude.ai works with **cookies alone**. The organization uuid is discovered inside the page, so it works on any account.
-- chatgpt.com returns 401 for cookies alone, so the page grabs its own session accessToken and sends it as a Bearer header. **That token never leaves the browser tab** — see [Privacy](#privacy).
+```
+Current session: 46% used · resets Sep 2 at 1:09pm (Asia/Seoul)
+Current week (all models): 5% used · resets Sep 3 at 4:59pm (Asia/Seoul)
+```
 
-These are undocumented endpoints, found by observing what the pages actually request. They can change without notice; see [Limitations](#limitations).
+The app reads every line beginning with `Current `. The name gives the window — `session` is the 5-hour one, `week` the weekly one, and some plans add per-model weekly windows — and the timezone in parentheses makes the reset time unambiguous. Percentages are the resilient part: if the reset wording ever changes, only the countdown is affected, and the last known reset time is kept rather than blanked.
 
-**Why not the DevTools protocol?** Since Chrome 136, `--remote-debugging-port` is ignored for the default profile. Using a separate `--user-data-dir` would work but loses your logged-in session, which defeats the purpose. AppleScript is the remaining option.
+The plan name is not in that output, so it comes from `claude auth status`, which prints JSON with `subscriptionType`. It is asked once per launch.
 
-**Why not scrape the page?** An earlier version read percentages off the rendered page and got them wrong — it read a promo banner ("weekly limit is **50%** higher") as 50% usage, and ChatGPT's "**80%** remaining" as 80% used. Showing a wrong number is worse than showing a stale one, so DOM scraping was removed entirely.
+Each `claude -p` call leaves a session transcript behind — at one refresh a minute that would be 1,400 files a day. So the app passes its own `--session-id` and deletes exactly that file afterwards. The name is a UUID it generated moments earlier, so no other session's record can be caught by it.
 
-### 2. Local CLI cache (reported as `Local`)
+### Codex — `codex app-server`
 
-If Chrome is closed or the integration is blocked, the app falls back to files the two CLIs already write:
+Codex has no usage subcommand, but the stdio JSON-RPC server behind its TUI does. The app speaks that protocol directly: `initialize`, `initialized`, then `account/rateLimits/read`.
 
-| | File | Field |
-|---|---|---|
-| Claude | `~/.claude.json` | `cachedUsageUtilization` |
-| Codex | `~/.codex/sessions/**/rollout-*.jsonl` | last `token_count` event → `rate_limits` |
+```json
+{"rateLimits": {"primary": {"usedPercent": 11, "windowDurationMins": 10080, "resetsAt": 1788848590},
+                "secondary": null, "planType": "pro"}}
+```
 
-These are values the CLIs cached from their own last request, so they go stale if you haven't used the CLI recently. When that happens the overlay footer shows how old the numbers are (`3m ago`).
+Structured, so there is nothing to parse loosely. Two things worth knowing:
 
-### Parsing
+- **`primary` and `secondary` do not tell you the window length.** On one plan `primary` is the 5-hour window, on another it is the weekly one. Labels come from `windowDurationMins` and nothing else.
+- The response also carries per-model limits (`rateLimitsByLimitId`) and rate-limit reset credits. The overlay ignores both. One row per window is the point.
 
-The four sources use different field names for the same thing — `window_minutes` vs `limit_window_seconds`, `resets_at` vs `reset_at`, `primary` vs `primary_window`. Instead of hardcoding paths, the app walks the JSON recursively and accepts only three shapes as a gauge:
+stdin has to stay open until the response arrives — close it and the server exits before answering.
 
-- `used_percent` (Codex, web and CLI)
-- `kind` + `percent` (Claude `limits[]`)
-- `utilization` under a known key such as `five_hour` / `seven_day`
+### What used to be here
 
-Anything else is ignored, so unknown codename fields are filtered out and one source changing shape doesn't break the others.
+Two earlier approaches, both removed:
+
+- **A hidden Chrome window** driven by AppleScript, calling each site's own usage API with the session you were already logged into. It worked, but it needed Chrome running and signed in, an Automation permission, and Chrome's **Allow JavaScript from Apple Events** setting — which, once on, lets *any* app with Automation permission run JavaScript in every session you are signed into. Too much to ask for a number in a menu bar.
+- **The CLIs' own cache files** (`~/.claude.json`, Codex session rollouts). Free to read, but passive: they hold whatever the CLI last cached, so they go stale the moment you stop working. While this rewrite was being tested, the Claude cache on that machine was 19 hours old.
+
+Running the CLIs costs neither of those things: live numbers, no browser, no permissions.
 
 ---
 
 ## Requirements
 
 - macOS 14 or later
-- Google Chrome, signed in to both claude.ai and chatgpt.com
+- **Claude Code CLI**, signed in — check with `claude auth status`
+- **Codex CLI**, signed in — check with `codex login status`
 - Xcode Command Line Tools (Swift 6) **only if you build from source**
+
+Only use one of them? Turn the other off under **Menu Bar**; its overlay row will otherwise say the CLI wasn't found.
 
 ### Permissions the app needs
 
-| Permission | Why | How it's granted |
-|---|---|---|
-| **Automation → Google Chrome** | To create tabs and run JavaScript in them | macOS prompts on first run: *"Usage Overlay wants to control Google Chrome."* Click **OK**. Later changes: System Settings → Privacy & Security → Automation |
+**None.** No Automation, no Accessibility, no Screen Recording, no Full Disk Access, no Camera, Microphone, or Location. The app runs two programs already on your Mac, as you, and reads their output.
 
-That is the only macOS permission. The app does **not** request or use Accessibility, Screen Recording, Full Disk Access, Camera, Microphone, or Location.
+### How it finds the CLIs
 
-### Chrome setting you must enable manually
+An app launched from Finder or at login gets a bare `PATH`, so `claude` and `codex` are not simply on it. The app looks where these CLIs actually install:
 
-> Chrome menu → **View → Developer → Allow JavaScript from Apple Events**
+`~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin`, `~/.claude/local`, `~/.bun/bin`, `~/.volta/bin`, `~/.cargo/bin`, `~/.npm-global/bin`, and every `~/.nvm/versions/node/*/bin`.
 
-This is off by default and **cannot be enabled programmatically** — it's a security setting, and Chrome deliberately requires a human to flip it. Without it the app silently stays on the `Local` fallback and never creates tabs.
+If yours lives somewhere else, point at it directly — no rebuild needed:
 
-⚠️ **Understand what this opens.** Once enabled, *any* application that has Automation permission for Chrome can execute JavaScript in your logged-in browsing sessions — not just this app. That includes reading page content and making authenticated requests as you. Turn it off in the same menu when you no longer want that.
+```bash
+defaults write io.github.ginjae.usage-overlay path.claude '/your/path/to/claude'
+defaults write io.github.ginjae.usage-overlay path.codex  '/your/path/to/codex'
+```
 
-### Files the app reads
+### Files the app touches
 
-Read-only, and only when falling back to `Local`:
-
-- `~/.claude.json` — only `cachedUsageUtilization` and `oauthAccount.organizationType` (the plan name) are used
-- `~/.codex/sessions/**/rollout-*.jsonl` — only the tail of the most recent files, looking for `rate_limits`
-
-The app never writes to either location.
+One file per Claude refresh: the session transcript that `claude -p` writes, which the app then deletes by the UUID it passed in. Nothing else — it does not read your config files, session history, or credential stores.
 
 ---
 
 ## Privacy
 
-- **The app makes no network requests of its own.** Every HTTP call happens inside a Chrome tab, from the origin it belongs to, using cookies already in your browser.
+- **The app makes no network requests of its own.** Each CLI talks to its own service with its own credentials, exactly as it does when you run it in a terminal.
+- **It never handles your tokens.** Credentials stay wherever each CLI keeps them. The app does not read the keychain, `~/.codex/auth.json`, or any other credential store.
 - **Nothing is sent anywhere.** No telemetry, no analytics, no remote logging.
-- **The ChatGPT session token stays in the page.** The injected script keeps it in a page-local variable to build the Bearer header. What comes back to the app is only `{href, ready, endpoint, resultAt, err, result}` — the token is not among them.
-- The only things stored on disk are your preferences (`io.github.ginjae.usage-overlay`): window position, opacity, refresh interval, and the Chrome tab ids being tracked.
+- The only things stored on disk are your preferences (`io.github.ginjae.usage-overlay`): window position, opacity, refresh interval, and the menu bar settings.
 
 ---
 
@@ -143,7 +145,7 @@ git push origin v0.2.0
 
 GitHub Actions builds the Universal app, creates a zip and SHA-256 checksum, and attaches both to a new GitHub Release.
 
-To confirm the Chrome integration is working, hover the menu bar item: the tooltip names each provider's source — `Web` means it's live, `Local` means it fell back to the CLI cache. The overlay itself stays out of it, since one badge for two providers can't say which is which.
+To confirm both providers are being read, hover the menu bar item: the tooltip lists every window of both, with plan names and — if a provider has stopped answering — how old its numbers are.
 
 ---
 
@@ -156,12 +158,11 @@ Clicking the menu bar item opens:
 | **Show Overlay** | Toggle the floating panel |
 | **Click Through** | Let mouse events pass to the window underneath (you can't drag the overlay while this is on, so position it first) |
 | **Opacity** | 100 / 85 / 70 / 50% |
-| **Refresh Interval** | 5s / 10s / 30s / 1 min / 10 min |
+| **Refresh Interval** | 30s / 1 min / 5 min / 10 min / 30 min |
 | **Menu Bar** | What the status item itself shows — see below |
-| **Read from Chrome** | Turn off to use only the local CLI cache |
-| **Hide Chrome Window** | Turn **off** when you need to see the window — for example to sign in again |
-| **Reopen Usage Tabs** | Close and recreate the tracked tabs if they get into a bad state |
 | **Refresh Now** / **Reset Position** / **Launch at Login** / **Quit** | |
+
+Thirty seconds is the floor because every refresh starts two processes and asks two services. Below that you would spend a second of CPU on a number that has barely moved.
 
 The overlay is dragged by its background, floats above other windows on every Space including full screen, and remembers its position by top-left corner.
 
@@ -182,33 +183,28 @@ Turning both providers off leaves a plain `Usage` label, so the menu is still re
 
 ---
 
-## How it treats your Chrome
+## How it runs the CLIs
 
-Deliberate rules, because an early version made a mess of it:
+Deliberate rules:
 
-- **Tabs you opened yourself are never touched.** The app tracks only tabs it created, by tab id. If a tracked tab is gone it will adopt an existing tab only when the URL matches **exactly**, hash included.
-- **Tab creation is rate limited to one per minute.** An early bug recreated a window on every poll; this cap means no bug can ever pile up windows again.
-- **Windows are hidden, not minimized.** `visible of window` is set to false, which leaves no Dock thumbnail and nothing drawn on screen, while the tab stays alive and JavaScript keeps working (`document.hidden` is simply true). Pushing the window off-screen doesn't work — macOS drags it back into view.
-- **If the JavaScript setting is off, no tabs are created at all.** There's no point opening a tab that can't be read. Flip the Chrome setting and it attaches within 60 seconds.
-- **If Chrome isn't running, it is not launched.** The app quietly uses the local cache instead.
-
-The URLs are configurable without rebuilding:
-
-```bash
-defaults write io.github.ginjae.usage-overlay url.claude 'https://claude.ai/new#settings/usage'
-defaults write io.github.ginjae.usage-overlay url.codex  'https://chatgpt.com/#settings/Usage'
-```
+- **Both providers are read in parallel.** One after the other would double the wait; together a refresh takes about a second.
+- **One refresh at a time.** While a refresh is in flight the timer's next tick is skipped, so a slow or hung CLI can never pile up processes.
+- **`USER` is set explicitly in the child environment.** With an empty `USER`, `claude -p "/usage"` prints *nothing at all* — no numbers, no error — and an app launched by launchd can have exactly that. The symptom looks like a broken app rather than a missing variable. This cost hours; it's noted here so it doesn't again.
+- **The working directory is your home**, never the app bundle, so neither CLI mistakes the bundle for a project it should read.
+- **Every call has a 30-second timeout.** On timeout the process is terminated and the previous numbers stay on screen with their age in the footer.
+- **Failure is per provider.** If Claude times out while Codex answers, Codex still updates.
+- **Only the transcript it created is deleted.** The file name is the UUID passed to `--session-id`, so the app can't touch a session it didn't start.
 
 ---
 
 ## Limitations
 
-- The Chrome JavaScript setting must be enabled by hand, and it survives restarts but not a profile reset.
-- Because the usage windows are hidden, you can't see a sign-in prompt if a session expires. Turn off **Hide Chrome Window** to bring it back.
-- A refresh waits up to 6 seconds per provider for the response, so it isn't instant.
-- If an endpoint changes, the app falls back to `Local` silently. The tooltip switching to `Local` is the only signal.
+- Claude's `/usage` output is written for people, not parsers. A wording change could break it — percentages last, since the reset phrasing is the fragile half. When a refresh brings back a percentage but no reset time, the previous reset time is kept rather than blanking the countdown.
+- `codex app-server` is marked experimental. The method name could change.
+- A refresh starts two processes, so it isn't instant and the shortest interval is 30 seconds.
+- If a CLI isn't installed or isn't signed in, that provider's row says so instead of showing numbers.
+- Both CLIs must be signed in on this Mac. There is no API-key path — these are subscription rate limits.
 - Screen capture tools will include the overlay.
-- Chrome tab ids do not compare equal to integer literals in AppleScript — `(id of t) as text` gives the same digits, but `(id of t) is 1546029274` is false. Every tab lookup compares strings. This cost hours; it's noted here so it doesn't again.
 
 ---
 
@@ -216,12 +212,11 @@ defaults write io.github.ginjae.usage-overlay url.codex  'https://chatgpt.com/#s
 
 | File | Role |
 |---|---|
-| `ChromeBridge.swift` | Drives Chrome through `osascript` — tab creation, tracking, adoption, JS execution, and the pre-flight check for the JS setting |
-| `PageScript.swift` | The JavaScript injected into each tab; resolves and calls the per-site usage endpoint |
-| `BrowserReader.swift` | Per-site polling, tab creation rate limit, response interpretation |
-| `UsageScan.swift` | Recursively extracts gauge-shaped objects from arbitrary JSON |
-| `ClaudeReader.swift` / `CodexReader.swift` | Local CLI cache fallbacks |
-| `UsageStore.swift` | 1-second clock, N-second refresh, Web→Local fallback, plan-name backfill |
+| `CommandRunner.swift` | Finds each CLI and runs it — install-location search, child environment, timeouts, reading stdout until the line we want |
+| `ClaudeReader.swift` | `claude -p "/usage"` — text parsing, reset-time parsing, plan lookup, transcript cleanup |
+| `CodexReader.swift` | `codex app-server` — the JSON-RPC handshake and the rate-limit response |
+| `Models.swift` | `Gauge` / `ProviderUsage` / `Snapshot`, and the duration and freshness formatting |
+| `UsageStore.swift` | 1-second clock, N-second refresh, parallel reads, keeping the last good numbers when a read fails |
 | `OverlayPanel.swift` / `OverlayView.swift` | The floating HUD |
 | `AppDelegate.swift` | Menu bar item and menu |
 | `MenuBarText.swift` | Turns a snapshot into the menu bar text and tooltip, per the Menu Bar settings |
