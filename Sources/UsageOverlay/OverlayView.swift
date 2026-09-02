@@ -55,7 +55,6 @@ struct OverlayView: View {
     }
 
     /// 값이 언제 것인지 늘 띄운다. 조용하면 멈춘 건지 최신인 건지 알 수 없다.
-    /// 어디서 온 값인지(Web/Local)는 여기 두면 어느 공급자 것인지 알 수 없어 메뉴바 툴팁에만 둔다.
     private var freshness: String {
         let providers = [store.snapshot.claude, store.snapshot.codex].compactMap { $0 }
         guard !providers.isEmpty else { return "Loading…" }

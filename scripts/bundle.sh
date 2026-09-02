@@ -126,8 +126,6 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleVersion</key><string>${BUILD_NUMBER}</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSUIElement</key><true/>
-  <key>NSAppleEventsUsageDescription</key>
-  <string>사용량 페이지를 열어 두고 새로고침하기 위해 Google Chrome을 제어합니다.</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>CFBundleIconFile</key><string>AppIcon</string>
 </dict>

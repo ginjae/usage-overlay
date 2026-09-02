@@ -65,7 +65,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         addSubmenu(to: menu, "Refresh Interval") { submenu in
-            for seconds in [5, 10, 30, 60, 600] {
+            for seconds in [30, 60, 300, 600, 1800] {
                 addChoice(to: submenu, Self.intervalLabel(seconds), #selector(setInterval(_:)),
                           value: seconds, selected: Prefs.refreshSeconds == seconds)
             }
@@ -88,13 +88,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             add(to: submenu, "Window Label", #selector(toggleMenuBarLabel), state: Prefs.menuBarLabel)
             add(to: submenu, "Provider Icon", #selector(toggleMenuBarIcon), state: Prefs.menuBarIcon)
             add(to: submenu, "Reset Time", #selector(toggleMenuBarReset), state: Prefs.menuBarReset)
-        }
-
-        menu.addItem(.separator())
-        add(to: menu, "Read from Chrome", #selector(toggleBrowser), state: Prefs.browserEnabled)
-        if Prefs.browserEnabled {
-            add(to: menu, "Hide Chrome Window", #selector(toggleHide), state: Prefs.hideWindow)
-            add(to: menu, "Reopen Usage Tabs", #selector(reopenTabs))
         }
 
         menu.addItem(.separator())
@@ -202,22 +195,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     // MARK: - 읽기
-
-    @objc private func toggleBrowser() {
-        Prefs.browserEnabled.toggle()
-        store.refresh()
-    }
-
-    @objc private func toggleHide() {
-        Prefs.hideWindow.toggle()
-        store.refresh()  // 다음 확인에서 창 상태가 바로 맞춰진다
-    }
-
-    @objc private func reopenTabs() {
-        store.claudeBrowser.closeTab()
-        store.codexBrowser.closeTab()
-        store.refresh()
-    }
 
     @objc private func refreshNow() { store.refresh() }
 
