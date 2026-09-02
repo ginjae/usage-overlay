@@ -150,7 +150,8 @@ private struct GaugeRow: View {
             Text(Format.remaining(until: gauge.resetsAt, from: now))
                 .font(.system(size: 9.5).monospacedDigit())
                 .foregroundStyle(.tertiary)
-                .frame(width: 40, alignment: .trailing)
+                .lineLimit(1)
+                .frame(width: 46, alignment: .trailing)
         }
     }
 }
