@@ -173,11 +173,11 @@ The overlay is dragged by its background, floats above other windows on every Sp
 | **Show Claude** / **Show Codex** | Which providers appear. Turn one off if you only use the other, or to save width |
 | **Tightest Window** | Follow whichever window has the least left — the default, and why the number can jump between windows |
 | **5-hour Window** / **Weekly Window** | Pin one window instead. A provider that doesn't report it falls back to its tightest, so the item never goes blank |
-| **All Windows** | Every window of every provider, with the icon on the first one only |
+| **All Windows** | Every window of every provider. The icon goes on the first one only, and windows of the same provider are joined by a `·` — the gap alone can't say where one provider ends |
 | **Percent Left** / **Percent Used** | Count down (default, matching the overlay) or up |
 | **Window Label** | Prefix the window length: `5h 39%` instead of `39%` |
 | **Provider Icon** | The Claude / OpenAI mark before each provider |
-| **Reset Time** | Append the countdown: `5h 39% · 2h 10m` |
+| **Reset Time** | Append the countdown: `5h 39% · 2h 10m`. With **All Windows** the joining `·` is dropped, since each window already carries one |
 
 Turning both providers off leaves a plain `Usage` label, so the menu is still reachable. The tooltip ignores all of these and always shows everything.
 

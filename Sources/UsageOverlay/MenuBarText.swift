@@ -1,15 +1,29 @@
 import AppKit
 
+/// 앞 조각과 어떻게 이어지는지. 메뉴바는 폭이 좁아 구분을 여백과 가운뎃점으로만 준다.
+enum MenuBarSeam {
+    /// 다른 공급자 — 여백을 넓게 둔다.
+    case provider
+    /// 같은 공급자의 다음 창 — 가운뎃점으로 묶는다.
+    case window
+    /// 같은 공급자지만 점을 못 쓰는 경우. 조각 안에 이미 점이 있으면 두 겹이 되어 뜻이 흐려진다.
+    case plain
+}
+
 /// 메뉴바에 그릴 한 덩어리. 아이콘은 공급자마다 한 번만 붙으므로 없을 수 있다.
 struct MenuBarPart {
     let icon: NSImage?
     let text: String
+    /// 첫 조각에서는 쓰이지 않는다.
+    var seam: MenuBarSeam = .provider
 }
 
 /// 이미지를 다시 합성할지 판단하려고 비교한다.
 /// NSImage 는 실체가 두 개뿐(Icons.claude / Icons.codex)이라 내용 비교 대신 동일성으로 충분하다.
 extension MenuBarPart: Equatable {
-    static func == (a: MenuBarPart, b: MenuBarPart) -> Bool { a.icon === b.icon && a.text == b.text }
+    static func == (a: MenuBarPart, b: MenuBarPart) -> Bool {
+        a.icon === b.icon && a.text == b.text && a.seam == b.seam
+    }
 }
 
 /// 메뉴바에 어떤 한도 창을 보여 줄지.
@@ -80,7 +94,10 @@ enum MenuBarText {
         guard !gauges.isEmpty else { return [MenuBarPart(icon: badge, text: "–")] }
         return gauges.enumerated().map { index, gauge in
             // 창을 여러 개 보여 줄 때 같은 아이콘이 반복되면 지저분하다. 공급자당 한 번만 붙인다.
-            MenuBarPart(icon: index == 0 ? badge : nil, text: text(for: gauge, now: now))
+            MenuBarPart(icon: index == 0 ? badge : nil,
+                        text: text(for: gauge, now: now),
+                        // 리셋 시각을 켜면 조각 안이 이미 "39% · 2h 10m" 이라 점을 또 찍지 않는다.
+                        seam: index == 0 ? .provider : (Prefs.menuBarReset ? .plain : .window))
         }
     }
 
