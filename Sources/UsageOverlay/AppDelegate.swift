@@ -54,47 +54,51 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
 
+        add(to: menu, "Refresh Now", #selector(refreshNow), key: "r")
+
+        menu.addItem(.sectionHeader(title: "Overlay"))
         add(to: menu, "Show Overlay", #selector(toggleOverlay), state: Prefs.overlayVisible)
         add(to: menu, "Click Through", #selector(toggleClickThrough), state: Prefs.clickThrough)
-
         addSubmenu(to: menu, "Opacity") { submenu in
             for value in [1.0, 0.85, 0.7, 0.5] {
                 addChoice(to: submenu, "\(Int(value * 100))%", #selector(setOpacity(_:)),
                           value: value, selected: abs(Prefs.opacity - value) < 0.01)
             }
         }
+        add(to: menu, "Reset Position", #selector(resetPosition))
 
+        menu.addItem(.sectionHeader(title: "Settings"))
+        addSubmenu(to: menu, "Menu Bar") { submenu in
+            submenu.addItem(.sectionHeader(title: "Providers"))
+            add(to: submenu, "Claude", #selector(toggleMenuBarClaude), state: Prefs.menuBarClaude)
+            add(to: submenu, "Codex", #selector(toggleMenuBarCodex), state: Prefs.menuBarCodex)
+
+            submenu.addItem(.sectionHeader(title: "Window"))
+            for window in MenuBarWindow.allCases {
+                addChoice(to: submenu, window.title, #selector(setMenuBarWindow(_:)),
+                          value: window.rawValue, selected: Prefs.menuBarWindow == window)
+            }
+
+            submenu.addItem(.sectionHeader(title: "Value"))
+            for value in MenuBarValue.allCases {
+                addChoice(to: submenu, value.title, #selector(setMenuBarValue(_:)),
+                          value: value.rawValue, selected: Prefs.menuBarValue == value)
+            }
+
+            submenu.addItem(.sectionHeader(title: "Details"))
+            add(to: submenu, "Window Label", #selector(toggleMenuBarLabel), state: Prefs.menuBarLabel)
+            add(to: submenu, "Provider Icon", #selector(toggleMenuBarIcon), state: Prefs.menuBarIcon)
+            add(to: submenu, "Reset Time", #selector(toggleMenuBarReset), state: Prefs.menuBarReset)
+        }
         addSubmenu(to: menu, "Refresh Interval") { submenu in
             for seconds in [30, 60, 300, 600, 1800] {
                 addChoice(to: submenu, Self.intervalLabel(seconds), #selector(setInterval(_:)),
                           value: seconds, selected: Prefs.refreshSeconds == seconds)
             }
         }
-
-        addSubmenu(to: menu, "Menu Bar") { submenu in
-            add(to: submenu, "Show Claude", #selector(toggleMenuBarClaude), state: Prefs.menuBarClaude)
-            add(to: submenu, "Show Codex", #selector(toggleMenuBarCodex), state: Prefs.menuBarCodex)
-            submenu.addItem(.separator())
-            for window in MenuBarWindow.allCases {
-                addChoice(to: submenu, window.title, #selector(setMenuBarWindow(_:)),
-                          value: window.rawValue, selected: Prefs.menuBarWindow == window)
-            }
-            submenu.addItem(.separator())
-            for value in MenuBarValue.allCases {
-                addChoice(to: submenu, value.title, #selector(setMenuBarValue(_:)),
-                          value: value.rawValue, selected: Prefs.menuBarValue == value)
-            }
-            submenu.addItem(.separator())
-            add(to: submenu, "Window Label", #selector(toggleMenuBarLabel), state: Prefs.menuBarLabel)
-            add(to: submenu, "Provider Icon", #selector(toggleMenuBarIcon), state: Prefs.menuBarIcon)
-            add(to: submenu, "Reset Time", #selector(toggleMenuBarReset), state: Prefs.menuBarReset)
-        }
-
-        menu.addItem(.separator())
-        add(to: menu, "Refresh Now", #selector(refreshNow), key: "r")
-        add(to: menu, "Reset Position", #selector(resetPosition))
         add(to: menu, "Launch at Login", #selector(toggleLaunchAtLogin),
             state: SMAppService.mainApp.status == .enabled)
+
         menu.addItem(.separator())
         add(to: menu, "Quit", #selector(quit), key: "q")
     }
