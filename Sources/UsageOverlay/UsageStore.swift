@@ -35,21 +35,28 @@ final class UsageStore: ObservableObject {
         guard !isRefreshing else { return }
         secondsSinceRefresh = 0
         isRefreshing = true
+        // 어느 화면에도 안 띄우는 공급자는 읽지 않는다. 설정은 메인에서 한 번만 본다.
+        let wantClaude = Prefs.readClaude
+        let wantCodex = Prefs.readCodex
         queue.async { [weak self] in
             guard let self else { return }
             // 둘 다 프로세스를 띄우고 기다리는 일이라 순서대로 하면 시간이 두 배가 된다.
             var claude: ProviderUsage?
             var codex: ProviderUsage?
             let group = DispatchGroup()
-            group.enter()
-            DispatchQueue.global(qos: .utility).async {
-                claude = ClaudeReader.read()
-                group.leave()
+            if wantClaude {
+                group.enter()
+                DispatchQueue.global(qos: .utility).async {
+                    claude = ClaudeReader.read()
+                    group.leave()
+                }
             }
-            group.enter()
-            DispatchQueue.global(qos: .utility).async {
-                codex = CodexReader.read()
-                group.leave()
+            if wantCodex {
+                group.enter()
+                DispatchQueue.global(qos: .utility).async {
+                    codex = CodexReader.read()
+                    group.leave()
+                }
             }
             group.wait()
 
@@ -57,8 +64,9 @@ final class UsageStore: ObservableObject {
                 self.isRefreshing = false
                 var next = self.snapshot
                 // 값을 못 받았으면(게이지가 빈 채로 돌아왔으면) 직전 숫자를 남기고 사유만 갈아 끼운다.
-                next.claude = Self.merge(new: claude, old: next.claude)
-                next.codex = Self.merge(new: codex, old: next.codex)
+                // 끈 공급자는 비운다. 안 그러면 툴팁에 다시 켜기 전의 숫자가 계속 남는다.
+                next.claude = wantClaude ? Self.merge(new: claude, old: next.claude) : nil
+                next.codex = wantCodex ? Self.merge(new: codex, old: next.codex) : nil
                 if next != self.snapshot { self.snapshot = next }
             }
         }

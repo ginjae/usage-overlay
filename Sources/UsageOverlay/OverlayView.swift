@@ -2,20 +2,33 @@ import SwiftUI
 
 struct OverlayView: View {
     @ObservedObject var store: UsageStore
+    /// 뷰가 Prefs 를 직접 읽으므로 SwiftUI 는 설정이 바뀐 걸 알 수 없다.
+    /// 패널이 이 값을 올려 주면 그때 다시 그린다.
+    var revision: Int = 0
 
     /// Claude 브랜드 주황. Codex는 로고가 단색이라 본문 색을 그대로 쓴다.
     private let claudeAccent = Color(red: 0.85, green: 0.45, blue: 0.28)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 11) {
-            ProviderBlock(usage: store.snapshot.claude,
-                          fallbackName: "Claude",
-                          icon: Icons.claude,
-                          accent: claudeAccent)
-            ProviderBlock(usage: store.snapshot.codex,
-                          fallbackName: "Codex",
-                          icon: Icons.codex,
-                          accent: .primary)
+            if Prefs.overlayClaude {
+                ProviderBlock(usage: store.snapshot.claude,
+                              fallbackName: "Claude",
+                              icon: Icons.claude,
+                              accent: claudeAccent)
+            }
+            if Prefs.overlayCodex {
+                ProviderBlock(usage: store.snapshot.codex,
+                              fallbackName: "Codex",
+                              icon: Icons.codex,
+                              accent: .primary)
+            }
+            // 둘 다 끄면 바닥글만 남아 빈 상자처럼 보인다. 고장이 아니라는 것만 알려 준다.
+            if !Prefs.overlayClaude, !Prefs.overlayCodex {
+                Text("No providers shown")
+                    .font(.system(size: 9.5))
+                    .foregroundStyle(.secondary)
+            }
             footer
         }
         .environment(\.now, store.now)
@@ -56,7 +69,9 @@ struct OverlayView: View {
 
     /// 값이 언제 것인지 늘 띄운다. 조용하면 멈춘 건지 최신인 건지 알 수 없다.
     private var freshness: String {
-        let providers = [store.snapshot.claude, store.snapshot.codex].compactMap { $0 }
+        let shown = [Prefs.overlayClaude ? store.snapshot.claude : nil,
+                     Prefs.overlayCodex ? store.snapshot.codex : nil]
+        let providers = shown.compactMap { $0 }
         guard !providers.isEmpty else { return "Loading…" }
         guard let oldest = providers.compactMap(\.updatedAt).min() else { return "Updated —" }
         return "Updated " + Format.since(oldest, from: store.now)

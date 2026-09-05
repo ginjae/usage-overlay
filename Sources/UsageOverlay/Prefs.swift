@@ -10,6 +10,8 @@ enum Prefs {
             Key.clickThrough: false,
             Key.refreshSeconds: 60,
             Key.opacity: 1.0,
+            Key.overlayClaude: true,
+            Key.overlayCodex: true,
             Key.menuBarClaude: true,
             Key.menuBarCodex: true,
             Key.menuBarWindow: MenuBarWindow.tightest.rawValue,
@@ -27,6 +29,8 @@ enum Prefs {
         static let opacity = "opacity"
         static let topLeftX = "topLeftX"
         static let topLeftY = "topLeftY"
+        static let overlayClaude = "overlayClaude"
+        static let overlayCodex = "overlayCodex"
         static let menuBarClaude = "menuBarClaude"
         static let menuBarCodex = "menuBarCodex"
         static let menuBarWindow = "menuBarWindow"
@@ -36,7 +40,23 @@ enum Prefs {
         static let menuBarReset = "menuBarReset"
     }
 
-    // MARK: - 메뉴바 표시
+    // MARK: - 공급자 표시
+
+    /// 오버레이에 공급자 블록을 넣을지. 한쪽만 쓰는 사람은 반대쪽을 꺼서 창을 줄인다.
+    static var overlayClaude: Bool {
+        get { defaults.bool(forKey: Key.overlayClaude) }
+        set { defaults.set(newValue, forKey: Key.overlayClaude) }
+    }
+
+    static var overlayCodex: Bool {
+        get { defaults.bool(forKey: Key.overlayCodex) }
+        set { defaults.set(newValue, forKey: Key.overlayCodex) }
+    }
+
+    /// 어느 화면에도 안 띄우는 공급자는 CLI 를 돌릴 이유가 없다.
+    /// 갱신마다 프로세스 하나와 몇 초를 아끼고, 안 쓰는 CLI 의 오류도 따라 사라진다.
+    static var readClaude: Bool { overlayClaude || menuBarClaude }
+    static var readCodex: Bool { overlayCodex || menuBarCodex }
 
     /// 메뉴바에 공급자를 넣을지. 하나만 쓰는 사람은 반대쪽을 꺼서 폭을 줄인다.
     static var menuBarClaude: Bool {
