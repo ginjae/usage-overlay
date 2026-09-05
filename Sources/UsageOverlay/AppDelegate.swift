@@ -58,6 +58,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         menu.addItem(.sectionHeader(title: "Overlay"))
         add(to: menu, "Show Overlay", #selector(toggleOverlay), state: Prefs.overlayVisible)
+        addSubmenu(to: menu, "Providers") { submenu in
+            add(to: submenu, "Claude", #selector(toggleOverlayClaude), state: Prefs.overlayClaude)
+            add(to: submenu, "Codex", #selector(toggleOverlayCodex), state: Prefs.overlayCodex)
+        }
         add(to: menu, "Click Through", #selector(toggleClickThrough), state: Prefs.clickThrough)
         addSubmenu(to: menu, "Opacity") { submenu in
             for value in [1.0, 0.85, 0.7, 0.5] {
@@ -157,17 +161,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         store.refresh()
     }
 
-    // MARK: - 메뉴바 표시 설정
+    // MARK: - 공급자 표시 설정
+
+    @objc private func toggleOverlayClaude() {
+        Prefs.overlayClaude.toggle()
+        providersChanged()
+    }
+
+    @objc private func toggleOverlayCodex() {
+        Prefs.overlayCodex.toggle()
+        providersChanged()
+    }
 
     @objc private func toggleMenuBarClaude() {
         Prefs.menuBarClaude.toggle()
-        updateStatusItem()
+        providersChanged()
     }
 
     @objc private func toggleMenuBarCodex() {
         Prefs.menuBarCodex.toggle()
-        updateStatusItem()
+        providersChanged()
     }
+
+    /// 꺼 두었던 공급자는 스냅샷이 비어 있다. 다시 켜면 다음 주기까지 기다리지 않고 바로 읽어 온다.
+    private func providersChanged() {
+        updateStatusItem()
+        panel.reload()
+        if (Prefs.readClaude && store.snapshot.claude == nil)
+            || (Prefs.readCodex && store.snapshot.codex == nil) {
+            store.refresh()
+        }
+    }
+
+    // MARK: - 메뉴바 표시 설정
 
     @objc private func setMenuBarWindow(_ sender: NSMenuItem) {
         guard let raw = sender.representedObject as? String,

@@ -6,6 +6,8 @@ A macOS menu bar app that keeps your **Claude** and **Codex** rate-limit usage o
 
 Each row is one rate-limit window: **how much of it is left**, and when it resets. Percentages count down, not up — 39% means you have 39% of that window still available. The bar drains and turns amber below 50%, red below 20%.
 
+Both providers are shown by default. If you only use one, **Overlay → Providers** hides the other and the panel shrinks to fit.
+
 The footer shows the age of the numbers once they go stale, plus a refresh button.
 
 Your tightest remaining headroom per provider also sits in the menu bar, tagged with the window it came from — `5h 39%` means 39% of the 5-hour window is left, `7d 62%` means the weekly one:
@@ -71,7 +73,7 @@ Running the CLIs costs neither of those things: live numbers, no browser, no per
 - **Codex CLI**, signed in — check with `codex login status`
 - Xcode Command Line Tools (Swift 6) **only if you build from source**
 
-Only use one of them? Turn the other off under **Menu Bar**; its overlay row will otherwise say the CLI wasn't found.
+Only use one of them? Turn the other off under **Overlay → Providers** and **Menu Bar → Providers**. Off in both places, that CLI is never run at all; left on anywhere, its row will say the CLI wasn't found.
 
 ### Permissions the app needs
 
@@ -101,7 +103,7 @@ One file per Claude refresh: the session transcript that `claude -p` writes, whi
 - **The app makes no network requests of its own.** Each CLI talks to its own service with its own credentials, exactly as it does when you run it in a terminal.
 - **It never handles your tokens.** Credentials stay wherever each CLI keeps them. The app does not read the keychain, `~/.codex/auth.json`, or any other credential store.
 - **Nothing is sent anywhere.** No telemetry, no analytics, no remote logging.
-- The only things stored on disk are your preferences (`io.github.ginjae.usage-overlay`): window position, opacity, refresh interval, and the menu bar settings.
+- The only things stored on disk are your preferences (`io.github.ginjae.usage-overlay`): window position, opacity, refresh interval, and which providers and details each surface shows.
 
 ---
 
@@ -156,6 +158,7 @@ Clicking the menu bar item opens:
 | Item | What it does |
 |---|---|
 | **Show Overlay** | Toggle the floating panel |
+| **Providers** | Which providers the overlay shows. Turn one off if you only use the other |
 | **Click Through** | Let mouse events pass to the window underneath (you can't drag the overlay while this is on, so position it first) |
 | **Opacity** | 100 / 85 / 70 / 50% |
 | **Refresh Interval** | 30s / 1 min / 5 min / 10 min / 30 min |
@@ -170,7 +173,7 @@ The overlay is dragged by its background, floats above other windows on every Sp
 
 | Option | What it does |
 |---|---|
-| **Show Claude** / **Show Codex** | Which providers appear. Turn one off if you only use the other, or to save width |
+| **Claude** / **Codex** | Which providers appear in the menu bar. Turn one off if you only use the other, or to save width |
 | **Tightest Window** | Follow whichever window has the least left — the default, and why the number can jump between windows |
 | **5-hour Window** / **Weekly Window** | Pin one window instead. A provider that doesn't report it falls back to its tightest, so the item never goes blank |
 | **All Windows** | Every window of every provider. The icon goes on the first one only, and windows of the same provider are joined by a `·` — the gap alone can't say where one provider ends |
@@ -179,7 +182,9 @@ The overlay is dragged by its background, floats above other windows on every Sp
 | **Provider Icon** | The Claude / OpenAI mark before each provider |
 | **Reset Time** | Append the countdown: `5h 39% · 2h 10m`. With **All Windows** the joining `·` is dropped, since each window already carries one |
 
-Turning both providers off leaves a plain `Usage` label, so the menu is still reachable. The tooltip ignores all of these and always shows everything.
+Turning both providers off leaves a plain `Usage` label, so the menu is still reachable. The tooltip ignores all of these and always shows everything the app is tracking.
+
+**A provider turned off in both the overlay and the menu bar isn't read at all.** No CLI is launched for it, so a refresh starts one process instead of two, and a CLI you don't have installed stops reporting that it wasn't found. Its last numbers are dropped rather than left to age in the tooltip; turning it back on reads it immediately instead of waiting for the next interval.
 
 ---
 
@@ -188,6 +193,7 @@ Turning both providers off leaves a plain `Usage` label, so the menu is still re
 Deliberate rules:
 
 - **Both providers are read in parallel.** One after the other would double the wait; together a refresh takes about a second.
+- **Only the providers you show are read.** One turned off in both the overlay and the menu bar is skipped, so a one-provider setup runs one process per refresh.
 - **One refresh at a time.** While a refresh is in flight the timer's next tick is skipped, so a slow or hung CLI can never pile up processes.
 - **`USER` is set explicitly in the child environment.** With an empty `USER`, `claude -p "/usage"` prints *nothing at all* — no numbers, no error — and an app launched by launchd can have exactly that. The symptom looks like a broken app rather than a missing variable. This cost hours; it's noted here so it doesn't again.
 - **The working directory is your home**, never the app bundle, so neither CLI mistakes the bundle for a project it should read.
