@@ -26,10 +26,6 @@ final class OverlayPanel: NSPanel {
         isReleasedWhenClosed = false
         ignoresMouseEvents = Prefs.clickThrough
 
-        let hosting = NSHostingController(rootView: OverlayView(store: store))
-        hosting.sizingOptions = [.preferredContentSize]  // 내용 높이에 맞춰 창이 따라온다
-        contentViewController = hosting
-
         NotificationCenter.default.addObserver(self, selector: #selector(didMove),
                                                name: NSWindow.didMoveNotification, object: self)
         NotificationCenter.default.addObserver(self, selector: #selector(didResize),
@@ -42,6 +38,24 @@ final class OverlayPanel: NSPanel {
     /// `.nonactivatingPanel` 이라 key가 되어도 앱이 전면으로 튀어나오지는 않는다.
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+
+    /// 숨긴 패널이 시계와 스냅샷을 구독하며 레이아웃을 계산하지 않도록 뷰도 해제한다.
+    func setVisible(_ visible: Bool) {
+        if visible {
+            if contentViewController == nil {
+                let hosting = NSHostingController(rootView: OverlayView(store: store, revision: revision))
+                hosting.sizingOptions = [.preferredContentSize]
+                contentViewController = hosting
+            }
+            applyStoredPosition()
+            orderFrontRegardless()
+            DispatchQueue.main.async { self.applyStoredPosition() }
+        } else {
+            orderOut(nil)
+            contentViewController = nil
+            contentView = nil
+        }
+    }
 
     /// 표시 설정이 바뀌었을 때. OverlayView 는 Prefs 를 직접 읽어서 SwiftUI 가 변화를 못 보므로
     /// 값이 달라진 rootView 를 새로 물려 다시 그리게 한다. 창 높이는 내용에 따라 알아서 따라온다.
