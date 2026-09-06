@@ -8,18 +8,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var panel: OverlayPanel!
     private let store = UsageStore()
     private var cancellables = Set<AnyCancellable>()
-    /// 지금 메뉴바에 그려져 있는 내용. 같은 그림을 1초마다 다시 합성하지 않으려고 들고 있다.
+    /// 내용이 달라졌을 때만 메뉴바 이미지와 툴팁을 교체한다.
     private var renderedParts: [MenuBarPart] = []
+    private var renderedTooltip: String?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Prefs.registerDefaults()
 
         panel = OverlayPanel(store: store)
-        if Prefs.overlayVisible {
-            panel.orderFrontRegardless()
-            // 내용 크기가 정해진 뒤에 자리를 잡아야 우상단 기본 위치가 제대로 나온다.
-            DispatchQueue.main.async { self.panel.applyStoredPosition() }
-        }
+        panel.setVisible(Prefs.overlayVisible)
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.imagePosition = .imageOnly
@@ -28,7 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusItem.menu = menu
         updateStatusItem()
 
-        // 스냅샷이 바뀔 때뿐 아니라 1초 시계에도 반응한다.
+        // 스냅샷과 분 단위 시계에 반응한다.
         // 남은 시간을 메뉴바에 띄운 경우 값이 그대로여도 카운트다운은 흘러야 한다.
         store.$snapshot.map { _ in () }
             .merge(with: store.$now.map { _ in () })
@@ -36,7 +33,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             .sink { [weak self] in self?.updateStatusItem() }
             .store(in: &cancellables)
 
+        observeWorkspaceActivity()
         store.start()
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        store.stop()
+    }
+
+    private func observeWorkspaceActivity() {
+        let center = NSWorkspace.shared.notificationCenter
+        let events: [(Notification.Name, Notification.Name, UsageStore.SuspensionReason)] = [
+            (NSWorkspace.willSleepNotification, NSWorkspace.didWakeNotification, .systemSleep),
+            (NSWorkspace.screensDidSleepNotification, NSWorkspace.screensDidWakeNotification, .displaySleep),
+            (NSWorkspace.sessionDidResignActiveNotification, NSWorkspace.sessionDidBecomeActiveNotification, .inactiveSession),
+        ]
+        for (sleep, wake, reason) in events {
+            for (name, suspended) in [(sleep, true), (wake, false)] {
+                center.publisher(for: name)
+                    .receive(on: RunLoop.main)
+                    .sink { [weak self] _ in self?.store.setSuspended(suspended, for: reason) }
+                    .store(in: &cancellables)
+            }
+        }
     }
 
     /// 메뉴바 그림과 툴팁을 현재 설정에 맞춰 다시 만든다.
@@ -46,7 +65,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             renderedParts = parts
             statusItem.button?.image = StatusBarImage.make(parts)
         }
-        statusItem.button?.toolTip = MenuBarText.tooltip(for: store.snapshot, now: store.now)
+        let tooltip = MenuBarText.tooltip(for: store.snapshot, now: store.now)
+        if tooltip != renderedTooltip {
+            renderedTooltip = tooltip
+            statusItem.button?.toolTip = tooltip
+        }
     }
 
     // MARK: - 메뉴
@@ -137,12 +160,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func toggleOverlay() {
         Prefs.overlayVisible.toggle()
-        if Prefs.overlayVisible {
-            panel.applyStoredPosition()
-            panel.orderFrontRegardless()
-        } else {
-            panel.orderOut(nil)
-        }
+        panel.setVisible(Prefs.overlayVisible)
     }
 
     @objc private func toggleClickThrough() {
@@ -158,7 +176,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func setInterval(_ sender: NSMenuItem) {
         guard let seconds = sender.representedObject as? Int else { return }
         Prefs.refreshSeconds = seconds
-        store.refresh()
+        store.settingsChanged()
     }
 
     // MARK: - 공급자 표시 설정
@@ -185,12 +203,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     /// 꺼 두었던 공급자는 스냅샷이 비어 있다. 다시 켜면 다음 주기까지 기다리지 않고 바로 읽어 온다.
     private func providersChanged() {
+        store.settingsChanged()
         updateStatusItem()
         panel.reload()
-        if (Prefs.readClaude && store.snapshot.claude == nil)
-            || (Prefs.readCodex && store.snapshot.codex == nil) {
-            store.refresh()
-        }
     }
 
     // MARK: - 메뉴바 표시 설정

@@ -50,19 +50,15 @@ struct OverlayView: View {
                 .foregroundStyle(.tertiary)
             Spacer(minLength: 4)
             Button(action: { store.refresh() }) {
-                Image(systemName: "arrow.clockwise")
+                Image(systemName: store.isRefreshing ? "hourglass" : "arrow.clockwise")
                     .font(.system(size: 9, weight: .semibold))
                     .foregroundStyle(.secondary)
-                    .rotationEffect(.degrees(store.isRefreshing ? 360 : 0))
-                    .animation(store.isRefreshing
-                               ? .linear(duration: 0.7).repeatForever(autoreverses: false)
-                               : .default,
-                               value: store.isRefreshing)
                     .frame(width: 14, height: 14)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help("Refresh now")
+            .disabled(store.isRefreshing)
+            .help(store.isRefreshing ? "Refreshing…" : "Refresh now")
         }
         .padding(.top, -2)
     }
@@ -78,7 +74,7 @@ struct OverlayView: View {
     }
 }
 
-/// 1초마다 갱신되는 시계를 하위 뷰에 흘려보낸다.
+/// 분 단위 시계를 하위 뷰에 흘려보낸다.
 private struct NowKey: EnvironmentKey {
     static let defaultValue = Date()
 }

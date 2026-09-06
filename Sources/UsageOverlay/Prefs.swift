@@ -8,7 +8,7 @@ enum Prefs {
         defaults.register(defaults: [
             Key.overlayVisible: true,
             Key.clickThrough: false,
-            Key.refreshSeconds: 60,
+            Key.refreshSeconds: 300,
             Key.opacity: 1.0,
             Key.overlayClaude: true,
             Key.overlayCodex: true,
