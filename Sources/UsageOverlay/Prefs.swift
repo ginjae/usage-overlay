@@ -19,6 +19,7 @@ enum Prefs {
             Key.menuBarLabel: true,
             Key.menuBarIcon: true,
             Key.menuBarReset: false,
+            Key.autoUpdate: true,
         ])
     }
 
@@ -38,6 +39,9 @@ enum Prefs {
         static let menuBarLabel = "menuBarLabel"
         static let menuBarIcon = "menuBarIcon"
         static let menuBarReset = "menuBarReset"
+        static let autoUpdate = "autoUpdate"
+        static let skippedVersion = "skippedVersion"
+        static let lastUpdateCheck = "lastUpdateCheck"
     }
 
     // MARK: - 공급자 표시
@@ -96,6 +100,26 @@ enum Prefs {
     static var menuBarReset: Bool {
         get { defaults.bool(forKey: Key.menuBarReset) }
         set { defaults.set(newValue, forKey: Key.menuBarReset) }
+    }
+
+    // MARK: - 업데이트
+
+    /// 하루 한 번 새 버전이 나왔는지 본다. 앱이 스스로 네트워크를 쓰는 유일한 자리라 끌 수 있게 둔다.
+    static var autoUpdate: Bool {
+        get { defaults.bool(forKey: Key.autoUpdate) }
+        set { defaults.set(newValue, forKey: Key.autoUpdate) }
+    }
+
+    /// "Skip This Version" 으로 접어 둔 버전. 자동 검사에서만 무시하고, 직접 물으면 다시 보여 준다.
+    static var skippedVersion: String? {
+        get { defaults.string(forKey: Key.skippedVersion) }
+        set { defaults.set(newValue, forKey: Key.skippedVersion) }
+    }
+
+    /// 마지막으로 물어본 시각. 껐다 켜는 것만으로 하루 한 번을 넘기지 않도록 남긴다.
+    static var lastUpdateCheck: Date? {
+        get { defaults.object(forKey: Key.lastUpdateCheck) as? Date }
+        set { defaults.set(newValue, forKey: Key.lastUpdateCheck) }
     }
 
     /// CLI를 흔치 않은 곳에 깔았을 때 직접 지정하는 자리. 재빌드 없이 고칠 수 있다.

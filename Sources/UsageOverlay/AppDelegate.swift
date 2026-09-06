@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
     private var panel: OverlayPanel!
     private let store = UsageStore()
+    private let updater = Updater()
     private var cancellables = Set<AnyCancellable>()
     /// 내용이 달라졌을 때만 메뉴바 이미지와 툴팁을 교체한다.
     private var renderedParts: [MenuBarPart] = []
@@ -35,10 +36,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         observeWorkspaceActivity()
         store.start()
+
+        updater.onCheckFinished = { [weak self] outcome, userInitiated in
+            self?.checkFinished(outcome, userInitiated: userInitiated)
+        }
+        updater.start()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         store.stop()
+        updater.stop()
     }
 
     private func observeWorkspaceActivity() {
@@ -125,6 +132,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         add(to: menu, "Launch at Login", #selector(toggleLaunchAtLogin),
             state: SMAppService.mainApp.status == .enabled)
+        addSubmenu(to: menu, "Updates") { submenu in
+            submenu.addItem(.sectionHeader(title: updater.currentVersion.map { "Version \($0)" }
+                ?? "Development build"))
+            switch updater.status {
+            case .idle: add(to: submenu, "Check Now", #selector(checkForUpdates))
+            case .checking: addStatus(to: submenu, "Checking\u{2026}")
+            case .downloading: addStatus(to: submenu, "Downloading update\u{2026}")
+            }
+            add(to: submenu, "Check Automatically", #selector(toggleAutoUpdate), state: Prefs.autoUpdate)
+            add(to: submenu, "Release Notes", #selector(openReleasesPage))
+        }
 
         menu.addItem(.separator())
         add(to: menu, "Quit", #selector(quit), key: "q")
@@ -148,6 +166,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func addChoice(to menu: NSMenu, _ title: String, _ action: Selector,
                            value: Any, selected: Bool) {
         add(to: menu, title, action, state: selected).representedObject = value
+    }
+
+    /// 누를 수 없는 안내 줄. 진행 중인 일을 그 자리에 그대로 보여 준다.
+    private func addStatus(to menu: NSMenu, _ title: String) {
+        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        item.isEnabled = false
+        menu.addItem(item)
     }
 
     private func addSubmenu(to menu: NSMenu, _ title: String, _ build: (NSMenu) -> Void) {
@@ -264,4 +289,81 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func quit() { NSApp.terminate(nil) }
+
+    // MARK: - 업데이트
+
+    @objc private func checkForUpdates() { updater.check(userInitiated: true) }
+
+    @objc private func toggleAutoUpdate() {
+        Prefs.autoUpdate.toggle()
+        updater.settingsChanged()
+    }
+
+    @objc private func openReleasesPage() { NSWorkspace.shared.open(Updater.releasesPage) }
+
+    /// 자동 검사는 새 버전을 찾았을 때만 말을 건다. 직접 눌렀을 때는 결과가 무엇이든 답한다.
+    private func checkFinished(_ outcome: Updater.Outcome, userInitiated: Bool) {
+        switch outcome {
+        case .found(let release):
+            offerUpdate(release)
+        case .upToDate:
+            guard userInitiated else { return }
+            let alert = NSAlert()
+            alert.messageText = "You're up to date."
+            alert.informativeText = updater.currentVersion.map { "Usage Overlay \($0) is the latest version." }
+                ?? "Nothing newer has been released."
+            run(alert)
+        case .failed(let message):
+            guard userInitiated else { return }
+            let alert = NSAlert()
+            alert.messageText = "Couldn't check for updates."
+            alert.informativeText = message
+            alert.addButton(withTitle: "Open Releases Page")
+            alert.addButton(withTitle: "OK")
+            if run(alert) == .alertFirstButtonReturn { openReleasesPage() }
+        }
+    }
+
+    private func offerUpdate(_ release: Release) {
+        let current = updater.currentVersion?.description ?? "?"
+        let alert = NSAlert()
+        alert.messageText = "Usage Overlay \(release.version) is available."
+        let notes = Self.summary(of: release.notes)
+        alert.informativeText = "You have \(current). Updating replaces the app and reopens it."
+            + (notes.isEmpty ? "" : "\n\n" + notes)
+        alert.addButton(withTitle: "Update")
+        alert.addButton(withTitle: "Later")
+        alert.addButton(withTitle: "Skip This Version")
+        switch run(alert) {
+        case .alertFirstButtonReturn:
+            // 성공하면 앱이 그대로 종료되고 새 번들로 다시 뜬다. 여기 돌아오는 건 실패했을 때뿐이다.
+            updater.install(release) { [weak self] message in
+                guard let self else { return }
+                let failure = NSAlert()
+                failure.messageText = "Couldn't install the update."
+                failure.informativeText = message
+                failure.addButton(withTitle: "Open Releases Page")
+                failure.addButton(withTitle: "OK")
+                if self.run(failure) == .alertFirstButtonReturn { NSWorkspace.shared.open(release.page) }
+            }
+        case .alertThirdButtonReturn:
+            Prefs.skippedVersion = release.version.description
+        default:
+            break
+        }
+    }
+
+    /// 릴리스 노트는 길이가 정해져 있지 않다. 알림창이 화면을 다 덮지 않을 만큼만 싣는다.
+    private static func summary(of notes: String) -> String {
+        let limit = 600
+        guard notes.count > limit else { return notes }
+        return notes.prefix(limit).trimmingCharacters(in: .whitespacesAndNewlines) + "\u{2026}"
+    }
+
+    /// 메뉴바 앱이라 늘 다른 앱이 앞에 있다. 알림창을 앞으로 끌어와야 보인다.
+    @discardableResult
+    private func run(_ alert: NSAlert) -> NSApplication.ModalResponse {
+        NSApp.activate(ignoringOtherApps: true)
+        return alert.runModal()
+    }
 }
