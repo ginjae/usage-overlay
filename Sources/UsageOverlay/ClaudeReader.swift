@@ -123,15 +123,17 @@ enum ClaudeReader {
         formatter.timeZone = zone
         formatter.amSymbol = "am"  // CLI는 소문자로 쓴다
         formatter.pmSymbol = "pm"
-        formatter.dateFormat = "MMM d 'at' h:mma yyyy"
 
         let now = Date()
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = zone
         let year = calendar.component(.year, from: now)
-        return [year, year + 1, year - 1]
-            .compactMap { formatter.date(from: "\(stamp) \($0)") }
-            .min { abs($0.timeIntervalSince(now)) < abs($1.timeIntervalSince(now)) }
+        // 정각이면 분을 떼고 쓴다. "resets Sep 10 at 5pm" 은 있고 "5:00pm" 은 없다.
+        return ["MMM d 'at' h:mma yyyy", "MMM d 'at' ha yyyy"].flatMap { format -> [Date] in
+            formatter.dateFormat = format
+            return [year, year + 1, year - 1].compactMap { formatter.date(from: "\(stamp) \($0)") }
+        }
+        .min { abs($0.timeIntervalSince(now)) < abs($1.timeIntervalSince(now)) }
     }
 
     /// 사용량 줄이 없을 때 무슨 일인지 알려 준다. 로그인이 안 됐거나 API 키를 쓰는 경우 등.
