@@ -192,12 +192,14 @@ final class UsageStore: ObservableObject {
             kept.note = new.note
             return kept
         }
-        // 퍼센트는 받았는데 리셋 시각만 비어 있는 경우가 가끔 있다(문장 형식이 어긋날 때).
-        // 같은 창의 리셋 시각은 분 단위로만 흔들리므로, 한 번씩 "—" 로 깜빡이는 것보다 직전 값이 낫다.
+        // 사용량이 0%이고 리셋 시각이 없으면 아직 시작하지 않은 창이므로 빈 값을 유지한다.
+        // 사용 중인 창의 시각만 파싱에 실패했다면, 아직 지나지 않은 직전 시각으로만 메운다.
         var merged = new
         merged.gauges = new.gauges.map { gauge in
-            guard gauge.resetsAt == nil,
-                  let previous = old.gauges.first(where: { $0.label == gauge.label })?.resetsAt
+            guard gauge.resetsAt == nil, gauge.percent > 0,
+                  let updatedAt = new.updatedAt,
+                  let previous = old.gauges.first(where: { $0.label == gauge.label })?.resetsAt,
+                  previous > updatedAt
             else { return gauge }
             var filled = gauge
             filled.resetsAt = previous
