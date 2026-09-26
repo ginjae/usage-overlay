@@ -21,7 +21,10 @@ final class OverlayPanel: NSPanel {
         hasShadow = true
         level = .floating
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
-        isMovableByWindowBackground = true
+        // macOS 27 부터는 OverlayView 의 WindowDragGesture 가 끈다. 둘 다 켜 두면 한 번 끌 때 두 번 움직일 수 있다.
+        if #unavailable(macOS 27) {
+            isMovableByWindowBackground = true
+        }
         hidesOnDeactivate = false
         isReleasedWhenClosed = false
         ignoresMouseEvents = Prefs.clickThrough
