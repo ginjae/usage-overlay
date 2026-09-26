@@ -41,6 +41,7 @@ struct OverlayView: View {
                 .strokeBorder(Color.white.opacity(0.13), lineWidth: 1)
         )
         .opacity(Prefs.opacity)
+        .modifier(WindowDrag())
     }
 
     private var footer: some View {
@@ -71,6 +72,24 @@ struct OverlayView: View {
         guard !providers.isEmpty else { return "Loading…" }
         guard let oldest = providers.compactMap(\.updatedAt).min() else { return "Updated —" }
         return "Updated " + Format.since(oldest, from: store.now)
+    }
+}
+
+/// 배경을 잡고 끌면 패널이 따라온다. 새로고침 버튼은 자기 제스처가 먼저라 그대로 눌린다.
+/// macOS 27 부터 NSHostingView 가 마우스 다운을 직접 받아 버려서
+/// `isMovableByWindowBackground` 만으로는 창이 끌리지 않는다.
+/// 다른 앱을 쓰다 돌아온 첫 클릭은 패널을 key 로 만드는 데만 쓰여 제스처가 무시되므로,
+/// 그 클릭으로도 바로 끌리도록 활성화 이벤트를 받는다.
+/// 26 까지는 패널의 배경 드래그가 잘 되므로 그쪽은 건드리지 않는다.
+private struct WindowDrag: ViewModifier {
+    @ViewBuilder func body(content: Content) -> some View {
+        if #available(macOS 27, *) {
+            content
+                .gesture(WindowDragGesture())
+                .allowsWindowActivationEvents(true)
+        } else {
+            content
+        }
     }
 }
 
