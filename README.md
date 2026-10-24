@@ -6,7 +6,7 @@ A macOS menu bar app that keeps your **Claude** and **Codex** rate-limit usage o
 
 By default, each row shows one rate-limit window: **how much of it is left**, and the time until it resets. For example, 39% means 39% is still available. You can switch to **Percent Used** separately for the menu bar, details, and overlay. Bars turn amber below 50% remaining and red below 20% remaining, whichever percentage you display. The thresholds and colors can be changed in **Settings → Colors**.
 
-The menu bar defaults to each provider's **Tightest Window**, the one with the least headroom. Reset time uses **Logo Clock** by default. Choose a specific window or **All Windows** for each provider in **Settings → Menu Bar**. Window labels are optional: with short labels, `5h 39%` means 39% of the 5-hour window is left, and `7d 62%` means 62% of the weekly window is left.
+The menu bar defaults to **All Windows** for each provider, with window labels hidden and **Logo Clock** for reset time. Choose a specific window or **Tightest Window** (the one with the least headroom) in **Settings → Menu Bar**. Window labels are optional: with short labels, `5h 39%` means 39% of the 5-hour window is left, and `7d 62%` means 62% of the weekly window is left.
 
 The **Menu Bar → Preview** shows your configuration on light and dark backgrounds:
 
@@ -28,9 +28,9 @@ Releases are ad-hoc signed rather than notarized, so macOS may block opening the
 
 ## Details and settings
 
-Click the menu bar item for the details. **Refresh Now** sits at the top, followed by the last updated time and a divider, then each enabled provider's usage and reset times. Hide the timestamp with **Settings → Details → Last updated**. Turn on **Pace** in the same pane to project whether your current usage rate will exhaust a window before it resets. Below the usage are **Show Overlay**, **Reset Overlay Position**, **Settings…** and **Quit Usage Overlay**.
+Click the menu bar item for the details. **Refresh Now** sits at the top, followed by the last updated time and a divider, then each enabled provider's usage and reset times. Reset times always use the weekday and local time. Hide the timestamp with **Settings → Details → Last updated**. Turn on **Pace** in the same pane to project whether your current usage rate will exhaust a window before it resets. Below the usage are **Show Overlay**, **Reset Overlay Position**, **Settings…** and **Quit Usage Overlay**.
 
-<img src="docs/details.png" width="346" alt="Details menu with Refresh Now first, Updated just now and a divider below it, followed by Claude and Codex usage and app controls.">
+<img src="docs/details.png" width="360" alt="Details menu with Refresh Now first, Updated just now and a divider below it, followed by Claude and Codex usage, weekday reset times, and app controls.">
 
 Settings apply as you change them:
 
@@ -38,13 +38,15 @@ Settings apply as you change them:
 |---|---|
 | **General** | Launch at login, refresh interval, provider order, where the CLIs are, updates |
 | **Menu Bar** | Providers and windows, percentage display, reset time, appearance, spacing, the hover tooltip |
-| **Details** | Providers, percent left or used, each line (plan, bar, time to reset, reset time, pace, last updated), width |
+| **Details** | Providers and windows, percent left or used, each line (plan, bar, time to reset, reset time, pace, last updated), width |
 | **Overlay** | Visibility, opacity, click-through, locked position, providers and windows, each column, width, text size, bar thickness, background, corners, border, Spaces, staying on top |
 | **Colors** | The three level colors and where each starts, and the provider logo colors |
 
 Each pane has **Restore Defaults** for that pane alone.
 
-By default the overlay floats above other windows on every Space, including full screen. Drag it by its background; it remembers where you left it.
+In **Details** or **Overlay**, choose **Selected Windows** under a provider to turn individual windows on or off — for example, show **5-hour** and **Weekly** while hiding **Fable**. Each pane and provider keeps its own selection. Only windows available on your account are displayed.
+
+The overlay starts hidden; enable it with **Show Overlay** in the menu. Its default selection is **5-hour** and **Weekly** for each provider. When shown, it floats above other windows on every Space, including full screen. Drag it by its background; it remembers where you left it. Existing saved preferences are preserved when updating.
 
 ## Updates
 

@@ -37,12 +37,23 @@ enum Provider: CaseIterable {
         self == .claude ? \.detailsClaude : \.detailsCodex
     }
 
+    var detailsWindow: ReferenceWritableKeyPath<Settings, WindowSelection> {
+        self == .claude ? \.detailsClaudeWindow : \.detailsCodexWindow
+    }
+
     var overlayShown: ReferenceWritableKeyPath<Settings, Bool> {
         self == .claude ? \.overlayClaude : \.overlayCodex
     }
 
-    var overlayWindow: ReferenceWritableKeyPath<Settings, WindowChoice> {
+    var overlayWindow: ReferenceWritableKeyPath<Settings, WindowSelection> {
         self == .claude ? \.overlayClaudeWindow : \.overlayCodexWindow
+    }
+
+    /// 기본 창과 계정에서 받은 추가 창. 지금 응답에 없어도 이미 고른 창은 끌 수 있게 남긴다.
+    func windowLabels(from gauges: [Gauge], selection: WindowSelection) -> [String] {
+        let known = windowChoices.compactMap(\.label)
+        let extra = Set(gauges.map(\.label)).union(selection.selectedLabels).subtracting(known)
+        return known + extra.sorted()
     }
 
     var accent: ReferenceWritableKeyPath<Settings, Tint> {
@@ -82,7 +93,7 @@ enum WindowChoice: String, CaseIterable, PrefValue {
     }
 
     /// 이름으로 고르는 창. 가장 빡빡한 창과 모든 창은 이름으로 고르지 않는다.
-    private var label: String? {
+    var label: String? {
         switch self {
         case .fiveHour: return "5-hour"
         case .weekly: return "Weekly"
@@ -94,6 +105,76 @@ enum WindowChoice: String, CaseIterable, PrefValue {
     /// 남은 양이 가장 적은 창 = 사용률이 가장 높은 창.
     private func tightest(_ gauges: [Gauge]) -> Gauge? {
         gauges.max { $0.percent < $1.percent }
+    }
+}
+
+/// 같은 창 이름도 화면·공급자가 다르면 별도의 Form 행이다.
+struct WindowToggleID: Hashable {
+    let preference: ReferenceWritableKeyPath<Settings, WindowSelection>
+    let label: String
+}
+
+/// 상세 창과 오버레이는 여러 창을 함께 고른다. 선택하지 않은 창으로 대신 표시하지 않는다.
+enum WindowSelection: Equatable, PrefValue {
+    case all, tightest, selected(Set<String>)
+
+    enum Mode: CaseIterable {
+        case all, selected, tightest
+
+        var title: String {
+            switch self {
+            case .all: return "All Windows"
+            case .selected: return "Selected Windows"
+            case .tightest: return "Tightest Window"
+            }
+        }
+    }
+
+    var mode: Mode {
+        switch self {
+        case .all: return .all
+        case .tightest: return .tightest
+        case .selected: return .selected
+        }
+    }
+
+    var selectedLabels: Set<String> {
+        if case .selected(let labels) = self { return labels }
+        return []
+    }
+
+    init?(stored: Any) {
+        // 이전 오버레이의 단일 창 설정도 같은 키에서 그대로 읽는다.
+        if let raw = stored as? String, let old = WindowChoice(rawValue: raw) {
+            if let label = old.label { self = .selected([label]) }
+            else { self = old == .all ? .all : .tightest }
+        } else if let labels = stored as? [String] {
+            self = .selected(Set(labels))
+        } else {
+            return nil
+        }
+    }
+
+    var stored: Any {
+        switch self {
+        case .all: return "all"
+        case .tightest: return "tightest"
+        case .selected(let labels): return labels.sorted()
+        }
+    }
+
+    func pick(from gauges: [Gauge]) -> [Gauge] {
+        switch self {
+        case .all: return gauges
+        case .tightest: return WindowChoice.tightest.pick(from: gauges)
+        case .selected(let labels): return gauges.filter { labels.contains($0.label) }
+        }
+    }
+
+    func emptyMessage(for usage: ProviderUsage?) -> String {
+        if case .selected(let labels) = self, labels.isEmpty { return "No windows selected" }
+        guard let usage else { return "Loading…" }
+        return usage.gauges.isEmpty ? "No data yet" : "Selected windows aren't available"
     }
 }
 

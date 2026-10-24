@@ -17,6 +17,9 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v6
 
+      - name: Run tests
+        run: swift test
+
       - name: Build universal app bundle
         run: |
           version="${GITHUB_REF_NAME#v}"
@@ -37,4 +40,4 @@ jobs:
             "build/Usage-Overlay-${GITHUB_REF_NAME}.zip" \
             "build/Usage-Overlay-${GITHUB_REF_NAME}.zip.sha256" \
             --verify-tag \
-            --generate-notes
+            --notes-file "docs/releases/${GITHUB_REF_NAME}.md"

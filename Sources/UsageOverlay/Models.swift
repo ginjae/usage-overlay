@@ -93,14 +93,9 @@ enum Format {
         return "\(m)m"
     }
 
-    /// 리셋 시각. 오늘이면 시각만, 한 주 안이면 요일을, 그 너머면 날짜를 붙인다.
-    static func clock(_ date: Date, from now: Date) -> String {
-        let calendar = Calendar.current
-        if calendar.isDate(date, inSameDayAs: now) { return date.formatted(date: .omitted, time: .shortened) }
-        if date.timeIntervalSince(now) < 6 * 86400 {
-            return date.formatted(.dateTime.weekday(.abbreviated).hour().minute())
-        }
-        return date.formatted(.dateTime.month(.abbreviated).day().hour().minute())
+    /// 리셋 시각은 남은 기간과 관계없이 항상 요일과 시간으로 표시한다.
+    static func clock(_ date: Date) -> String {
+        date.formatted(.dateTime.weekday(.abbreviated).hour().minute())
     }
 
     /// 보여 주는 값 가운데 가장 오래된 것의 나이. 늘 떠 있는 자리라 조용하면 멈춘 건지 최신인 건지 알 수 없다.

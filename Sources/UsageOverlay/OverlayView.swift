@@ -110,7 +110,8 @@ private struct ProviderBlock: View {
 
     var body: some View {
         let scale = settings.overlayScale
-        let gauges = usage.map { settings[keyPath: provider.overlayWindow].pick(from: $0.gauges) } ?? []
+        let selection = settings[keyPath: provider.overlayWindow]
+        let gauges = selection.pick(from: usage?.gauges ?? [])
         VStack(alignment: .leading, spacing: 5 * scale) {
             if settings.overlayHeader {
                 HStack(spacing: 5 * scale) {
@@ -136,7 +137,7 @@ private struct ProviderBlock: View {
                     GaugeRow(gauge: gauge)
                 }
             } else {
-                Text(usage?.note ?? "Loading…")
+                Text(usage?.note ?? selection.emptyMessage(for: usage))
                     .font(.system(size: 9.5 * scale))
                     .foregroundStyle(.secondary)
             }

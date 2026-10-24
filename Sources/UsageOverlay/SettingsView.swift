@@ -14,6 +14,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         let window = NSWindow(contentViewController: hosting)
         window.title = "Usage Overlay Settings"
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+        // 분할 뷰의 배경을 제목 표시줄까지 이어 경계를 하나로 맞춘다.
+        // 별도 제목 표시줄 배경은 호환 레이아웃에서 사이드바보다 2pt 먼저 시작한다.
+        window.titlebarAppearsTransparent = true
         window.isReleasedWhenClosed = false
         window.setContentSize(NSSize(width: 760, height: 640))
         window.center()
@@ -96,7 +99,7 @@ struct SettingsView: View {
         case .general: GeneralPane(store: store, updater: updater, actions: actions)
         case .menuBar: MenuBarPane(store: store)
         case .details: DetailsPane(store: store)
-        case .overlay: OverlayPane(actions: actions)
+        case .overlay: OverlayPane(store: store, actions: actions)
         case .colors: ColorsPane()
         }
     }
@@ -161,7 +164,7 @@ struct ColorRow: View {
     }
 }
 
-/// 공급자 한 줄: 켜고 끄기와 어느 창을 띄울지. 메뉴바와 오버레이가 같이 쓴다.
+/// 공급자 켜고 끄기. 메뉴바에서는 단일 창 선택도 붙인다.
 struct ProviderRows: View {
     @ObservedObject var settings = Settings.shared
     let provider: Provider
@@ -185,6 +188,52 @@ struct ProviderRows: View {
                       choices: provider.windowChoices, label: \.title)
                 .disabled(!settings[keyPath: shown])
         }
+    }
+}
+
+/// 상세 창과 오버레이에서 공급자별로 여러 창을 켜고 끈다.
+struct ProviderWindowRows: View {
+    @ObservedObject var settings = Settings.shared
+    let provider: Provider
+    let shown: ReferenceWritableKeyPath<Settings, Bool>
+    let window: ReferenceWritableKeyPath<Settings, WindowSelection>
+    let gauges: [Gauge]
+
+    private var selection: WindowSelection { settings[keyPath: window] }
+    private var labels: [String] { provider.windowLabels(from: gauges, selection: selection) }
+
+    var body: some View {
+        ProviderRows(provider: provider, shown: shown)
+        Group {
+            ChoiceRow(title: "\(provider.name) windows", selection: Binding(
+                get: { selection.mode },
+                set: { mode in
+                    switch mode {
+                    case .all: settings[keyPath: window] = .all
+                    case .tightest: settings[keyPath: window] = .tightest
+                    case .selected:
+                        if selection.mode != .selected {
+                            settings[keyPath: window] = .selected(Set(labels))
+                        }
+                    }
+                }), choices: WindowSelection.Mode.allCases, label: \.title)
+            if selection.mode == .selected {
+                // Form은 중첩된 행을 펼친다. 이름만 ID로 쓰면 Codex 행이 Claude의
+                // 바인딩을 재사용하므로 화면·공급자를 가리키는 설정 키 경로도 포함한다.
+                ForEach(labels.map { WindowToggleID(preference: window, label: $0) }, id: \.self) { row in
+                    let label = row.label
+                    Toggle(label, isOn: Binding(
+                        get: { selection.selectedLabels.contains(label) },
+                        set: { enabled in
+                            var selected = selection.selectedLabels
+                            if enabled { selected.insert(label) } else { selected.remove(label) }
+                            settings[keyPath: window] = .selected(selected)
+                        }))
+                        .accessibilityLabel("\(provider.name) \(label)")
+                }
+            }
+        }
+        .disabled(!settings[keyPath: shown])
     }
 }
 

@@ -42,6 +42,8 @@ private struct ProviderDetails: View {
     let now: Date
 
     var body: some View {
+        let selection = settings[keyPath: provider.detailsWindow]
+        let gauges = selection.pick(from: usage?.gauges ?? [])
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
                 Image(nsImage: provider.icon)
@@ -65,12 +67,12 @@ private struct ProviderDetails: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            if let gauges = usage?.gauges, !gauges.isEmpty {
+            if !gauges.isEmpty {
                 ForEach(gauges) { gauge in
                     WindowDetails(gauge: gauge, now: now)
                 }
             } else if usage?.note == nil {
-                Text(usage == nil ? "Loading…" : "No data yet")
+                Text(selection.emptyMessage(for: usage))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -105,15 +107,15 @@ private struct WindowDetails: View {
         }
     }
 
-    /// "Resets in 2h 10m · 3:20 PM". 카운트다운과 시각 중 켠 것만 잇는다.
+    /// "Resets in 2h 10m · Sat 3:20 PM". 카운트다운과 시각 중 켠 것만 잇는다.
     private var resetLine: String? {
         guard let resetsAt = gauge.resetsAt else { return nil }
         let countdown = Format.remaining(until: resetsAt, from: now)
         if countdown == "soon" { return "Resetting now" }
         switch (settings.detailsCountdown, settings.detailsResetTime) {
-        case (true, true): return "Resets in \(countdown) · \(Format.clock(resetsAt, from: now))"
+        case (true, true): return "Resets in \(countdown) · \(Format.clock(resetsAt))"
         case (true, false): return "Resets in \(countdown)"
-        case (false, true): return "Resets \(Format.clock(resetsAt, from: now))"
+        case (false, true): return "Resets \(Format.clock(resetsAt))"
         case (false, false): return nil
         }
     }

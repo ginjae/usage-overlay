@@ -31,11 +31,11 @@ final class Settings: ObservableObject {
     @Pref("menuBarClaude", .menuBar) var menuBarClaude = true
     @Pref("menuBarCodex", .menuBar) var menuBarCodex = true
     /// 예전에는 두 공급자가 창 고르기 하나를 같이 썼다. 따로 고르기 전까지는 그 값을 물려받는다.
-    @Pref("menuBar.claude.window", .menuBar, legacy: "menuBarWindow") var menuBarClaudeWindow = WindowChoice.tightest
-    @Pref("menuBar.codex.window", .menuBar, legacy: "menuBarWindow") var menuBarCodexWindow = WindowChoice.tightest
+    @Pref("menuBar.claude.window", .menuBar, legacy: "menuBarWindow") var menuBarClaudeWindow = WindowChoice.all
+    @Pref("menuBar.codex.window", .menuBar, legacy: "menuBarWindow") var menuBarCodexWindow = WindowChoice.all
     @Pref("menuBarValue", .menuBar) var menuBarValue = PercentKind.remaining
     /// 숫자 앞 창 이름. 예) `5h 39%`
-    @Pref("menuBarLabel", .menuBar) var menuBarLabel = LabelStyle.short
+    @Pref("menuBarLabel", .menuBar) var menuBarLabel = LabelStyle.off
     @Pref("menuBar.percentSign", .menuBar) var menuBarPercentSign = true
     @Pref("menuBar.separator", .menuBar) var menuBarSeparator = WindowSeparator.dot
     @Pref("menuBarIcon", .menuBar) var menuBarIcon = true
@@ -67,6 +67,8 @@ final class Settings: ObservableObject {
 
     @Pref("details.claude", .details) var detailsClaude = true
     @Pref("details.codex", .details) var detailsCodex = true
+    @Pref("details.claude.window", .details) var detailsClaudeWindow = WindowSelection.all
+    @Pref("details.codex.window", .details) var detailsCodexWindow = WindowSelection.all
     @Pref("details.value", .details) var detailsValue = PercentKind.remaining
     @Pref("details.plan", .details) var detailsPlan = true
     @Pref("details.bars", .details) var detailsBars = true
@@ -80,14 +82,14 @@ final class Settings: ObservableObject {
 
     // MARK: - 오버레이
 
-    @Pref("overlayVisible", .overlay) var overlayVisible = true
+    @Pref("overlayVisible", .overlay) var overlayVisible = false
     @Pref("clickThrough", .overlay) var overlayClickThrough = false
     @Pref("overlay.locked", .overlay) var overlayLocked = false
     @Pref("opacity", .overlay) var overlayOpacity = 1.0
     @Pref("overlayClaude", .overlay) var overlayClaude = true
     @Pref("overlayCodex", .overlay) var overlayCodex = true
-    @Pref("overlay.claude.window", .overlay) var overlayClaudeWindow = WindowChoice.all
-    @Pref("overlay.codex.window", .overlay) var overlayCodexWindow = WindowChoice.all
+    @Pref("overlay.claude.window", .overlay) var overlayClaudeWindow = WindowSelection.selected(["5-hour", "Weekly"])
+    @Pref("overlay.codex.window", .overlay) var overlayCodexWindow = WindowSelection.selected(["5-hour", "Weekly"])
     @Pref("overlay.value", .overlay) var overlayValue = PercentKind.remaining
     @Pref("overlay.header", .overlay) var overlayHeader = true
     @Pref("overlay.plan", .overlay) var overlayPlan = true

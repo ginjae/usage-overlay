@@ -285,7 +285,9 @@ struct DetailsPane: View {
 
             Section("Providers") {
                 ForEach(settings.providerOrder.providers, id: \.self) { provider in
-                    ProviderRows(provider: provider, shown: provider.detailsShown)
+                    ProviderWindowRows(provider: provider, shown: provider.detailsShown,
+                                       window: provider.detailsWindow,
+                                       gauges: provider.usage(in: store.snapshot)?.gauges ?? [])
                 }
             }
 
@@ -315,6 +317,7 @@ struct DetailsPane: View {
 
 struct OverlayPane: View {
     @ObservedObject var settings = Settings.shared
+    @ObservedObject var store: UsageStore
     let actions: SettingsActions
 
     var body: some View {
@@ -333,7 +336,9 @@ struct OverlayPane: View {
 
             Section("Providers") {
                 ForEach(settings.providerOrder.providers, id: \.self) { provider in
-                    ProviderRows(provider: provider, shown: provider.overlayShown, window: provider.overlayWindow)
+                    ProviderWindowRows(provider: provider, shown: provider.overlayShown,
+                                       window: provider.overlayWindow,
+                                       gauges: provider.usage(in: store.snapshot)?.gauges ?? [])
                 }
             }
 
