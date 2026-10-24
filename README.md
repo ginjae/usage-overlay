@@ -14,6 +14,8 @@ The **Menu Bar → Preview** shows your configuration on light and dark backgrou
 
 The numbers come from the CLIs you already have. The default refresh interval is 5 minutes; change it under **Settings → General**. Polling pauses while the Mac or display sleeps, or your login session is inactive, and resumes when active. Usage checks query quota information without asking a model to generate a response.
 
+If a provider is enabled only in the overlay, hiding the overlay pauses that provider's usage queries until the overlay is shown again.
+
 ## Install
 
 Download `Usage-Overlay-v*.zip` from the [latest release](https://github.com/ginjae/usage-overlay/releases/latest), unzip it, and move **Usage Overlay.app** to `/Applications`.
@@ -80,3 +82,5 @@ xcode-select --install     # if the build tools are missing
 Run `./scripts/bundle.sh --universal` to build for both Apple Silicon and Intel. Open the resulting app from `build`, or copy it to `/Applications`.
 
 Set `APP_VERSION` and `BUILD_NUMBER` when you need specific bundle version metadata; the script defaults to `0.1.0` and `1`.
+
+Run `swift test` for regression checks covering CLI timeouts, process cleanup, output limits, and provider visibility. Tests compile a small local CLI fixture with `xcrun clang`; they do not query your Claude or Codex accounts.

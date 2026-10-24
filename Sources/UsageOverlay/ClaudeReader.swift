@@ -51,8 +51,11 @@ enum ClaudeReader {
         let expected = projects
             .appendingPathComponent(NSHomeDirectory().replacingOccurrences(of: "/", with: "-"))
             .appendingPathComponent(file)
-        var candidates = [expected]
-        candidates += ((try? manager.contentsOfDirectory(at: projects, includingPropertiesForKeys: nil)) ?? [])
+        if manager.fileExists(atPath: expected.path) {
+            try? manager.removeItem(at: expected)
+            return
+        }
+        let candidates = ((try? manager.contentsOfDirectory(at: projects, includingPropertiesForKeys: nil)) ?? [])
             .map { $0.appendingPathComponent(file) }
         guard let found = candidates.first(where: { manager.fileExists(atPath: $0.path) }) else { return }
         try? manager.removeItem(at: found)

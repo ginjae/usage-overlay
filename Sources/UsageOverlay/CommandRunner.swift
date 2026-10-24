@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 /// CLI를 찾아 실행하고 표준출력을 돌려준다. 사용량은 전부 여기를 거쳐 들어온다.
 ///
@@ -80,57 +81,110 @@ enum CommandRunner {
 
         let output = Pipe()
         let input = Pipe()
+        defer {
+            for handle in [output.fileHandleForReading, output.fileHandleForWriting,
+                           input.fileHandleForReading, input.fileHandleForWriting] {
+                try? handle.close()
+            }
+        }
         process.standardOutput = output
         process.standardInput = input
         process.standardError = FileHandle.nullDevice  // 안 읽을 파이프를 물리면 가득 차서 멈춘다
 
+        let reader = output.fileHandleForReading.fileDescriptor
+        let writer = input.fileHandleForWriting.fileDescriptor
+        // poll이 준비됐다고 해도 큰 읽기/쓰기가 timeout을 넘겨 막히지 않게 한다.
+        guard fcntl(reader, F_SETFL, O_NONBLOCK) != -1,
+              fcntl(writer, F_SETFL, O_NONBLOCK) != -1,
+              fcntl(writer, F_SETNOSIGPIPE, 1) != -1 else { return nil }
+        let exited = DispatchSemaphore(value: 0)
+        process.terminationHandler = { _ in exited.signal() }
         do {
             try process.run()
         } catch {
             return nil
         }
-
-        let reader = output.fileHandleForReading
-        let done = DispatchSemaphore(value: 0)
-        var collected = Data()
-        var matched: String?
-
-        // availableData 는 블로킹이라 별도 스레드에서 돌린다.
-        // 여기서 쓴 값은 done 을 지나서만 읽으므로 그 순서가 곧 동기화다.
-        Thread.detachNewThread {
-            var pending = ""
-            while true {
-                let chunk = reader.availableData
-                if chunk.isEmpty { break }  // EOF
-                collected.append(chunk)
-                guard let match else { continue }
-                pending += String(decoding: chunk, as: UTF8.self)
-                var lines = pending.components(separatedBy: "\n")
-                pending = lines.removeLast()  // 마지막 조각은 아직 줄이 안 끝났을 수 있다
-                if let hit = lines.first(where: match) {
-                    matched = hit
-                    break
+        defer {
+            try? input.fileHandleForWriting.close()
+            // 응답을 받았어도 app-server는 살아 있다. 종료를 무시하는 CLI도 다음 조회에 남기지 않는다.
+            if process.isRunning {
+                process.terminate()
+                if exited.wait(timeout: .now() + 2) == .timedOut, process.isRunning {
+                    kill(process.processIdentifier, SIGKILL)
                 }
             }
-            done.signal()
+            process.waitUntilExit()
         }
 
         if stdin.isEmpty {
             try? input.fileHandleForWriting.close()
-        } else {
-            let payload = Data((stdin.joined(separator: "\n") + "\n").utf8)
-            try? input.fileHandleForWriting.write(contentsOf: payload)
         }
+        let payload = stdin.isEmpty ? Data() : Data((stdin.joined(separator: "\n") + "\n").utf8)
+        return readOutput(reader: reader, writer: writer, payload: payload, timeout: timeout, match: match)
+    }
 
-        let finished = done.wait(timeout: .now() + timeout) == .success
-        // 원하는 줄을 이미 받았어도 서버형 프로세스는 스스로 끝나지 않는다.
-        if !finished || match != nil { process.terminate() }
-        // 이미 신호가 왔으면(finished) 읽기 스레드는 끝난 뒤다. 여기서 또 기다리면 그대로 2초를 버린다.
-        if !finished { _ = done.wait(timeout: .now() + 2) }
-        try? input.fileHandleForWriting.close()
+    /// 호출한 조회 큐에서 I/O 준비를 기다린다. 별도 읽기 스레드나 timeout 뒤에 남는 콜백이 없다.
+    private static func readOutput(reader: Int32, writer: Int32, payload: Data,
+                                   timeout: TimeInterval, match: ((String) -> Bool)?) -> String? {
+        let deadline = (DispatchTime.now() + timeout).uptimeNanoseconds
+        // 사용량 응답은 몇 KB다. 잘못된 CLI가 출력을 쏟아도 메모리가 계속 늘지 않게 한다.
+        let outputLimit = 1024 * 1024
+        var received = 0
+        var sent = 0
+        var buffered = Data()
+        var chunk = [UInt8](repeating: 0, count: 8192)
 
-        if match != nil { return matched }
-        return finished ? String(decoding: collected, as: UTF8.self) : nil
+        while true {
+            let now = DispatchTime.now().uptimeNanoseconds
+            guard now < deadline else { return nil }
+            let milliseconds = Int32(min((deadline - now) / 1_000_000 + 1, UInt64(Int32.max)))
+            var descriptors = [
+                pollfd(fd: reader, events: Int16(POLLIN), revents: 0),
+                pollfd(fd: sent < payload.count ? writer : -1, events: Int16(POLLOUT), revents: 0),
+            ]
+            let ready = poll(&descriptors, nfds_t(descriptors.count), milliseconds)
+            if ready < 0, errno == EINTR { continue }
+            guard ready > 0 else { return nil }
+
+            if descriptors[0].revents & Int16(POLLIN | POLLHUP) != 0 {
+                let count = chunk.withUnsafeMutableBytes { Darwin.read(reader, $0.baseAddress!, $0.count) }
+                if count == 0 {
+                    let tail = String(decoding: buffered, as: UTF8.self)
+                    if let match { return match(tail) ? tail : nil }
+                    return tail
+                }
+                if count < 0 {
+                    if errno != EINTR && errno != EAGAIN { return nil }
+                } else {
+                    received += count
+                    guard received <= outputLimit else { return nil }
+                    buffered.append(contentsOf: chunk.prefix(count))
+                    if let match {
+                        // 바이트 단위로 줄을 모아야 UTF-8 문자가 read 경계에서 잘려도 보존된다.
+                        while let newline = buffered.firstIndex(of: 10) {
+                            let line = String(decoding: buffered[..<newline], as: UTF8.self)
+                            if match(line) { return line }
+                            buffered.removeSubrange(...newline)
+                        }
+                    }
+                }
+            } else if descriptors[0].revents & Int16(POLLERR | POLLNVAL) != 0 {
+                return nil
+            }
+
+            if descriptors[1].revents & Int16(POLLOUT) != 0 {
+                let count = payload.withUnsafeBytes {
+                    Darwin.write(writer, $0.baseAddress!.advanced(by: sent), $0.count - sent)
+                }
+                if count > 0 {
+                    sent += count
+                } else if count < 0, errno != EINTR && errno != EAGAIN {
+                    return nil
+                }
+            } else if descriptors[1].revents & Int16(POLLERR | POLLHUP | POLLNVAL) != 0 {
+                return nil
+            }
+        }
     }
 
     private static func environment(for executable: URL) -> [String: String] {

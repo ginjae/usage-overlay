@@ -123,8 +123,8 @@ final class Settings: ObservableObject {
     /// 어느 화면에도 안 띄우는 공급자는 CLI 를 돌릴 이유가 없다.
     /// 갱신마다 프로세스 하나와 몇 초를 아끼고, 안 쓰는 CLI 의 오류도 따라 사라진다.
     func reads(_ provider: Provider) -> Bool {
-        self[keyPath: provider.menuBarShown] || self[keyPath: provider.overlayShown]
-            || self[keyPath: provider.detailsShown]
+        self[keyPath: provider.menuBarShown] || self[keyPath: provider.detailsShown]
+            || (overlayVisible && self[keyPath: provider.overlayShown])
     }
 
     /// 직접 지정한 CLI 경로. 비어 있으면 nil.
