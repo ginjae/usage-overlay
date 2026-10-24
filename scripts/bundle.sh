@@ -61,6 +61,8 @@ fi
 SWIFT="$(xcrun --find swift)"
 CODESIGN="$(xcrun --find codesign 2>/dev/null)" || die "codesign was not found. Install the Xcode Command Line Tools with: xcode-select --install"
 ICON_SRC="Resources/AppIcon.png"
+# 16 · 32pt 칸은 큰 그림을 줄이면 뭉개져서, 있으면 작은 크기용으로 따로 그린 그림을 쓴다.
+ICON_SMALL_SRC="Resources/AppIcon-small.png"
 
 if ! SWIFT_VERSION_OUTPUT="$("$SWIFT" --version 2>&1)"; then
   printf '%s\n' "$SWIFT_VERSION_OUTPUT" >&2
@@ -132,19 +134,21 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-# 1024px 마스터 하나로 아이콘 세트를 만든다. 커밋해 두는 건 PNG 하나뿐.
+# 1024px 마스터로 아이콘 세트를 만든다. 작은 칸(16 · 32pt)은 작은 크기용 그림이 있으면 그걸 쓴다.
 # 아이콘이 없어도 앱은 돌아가므로 여기서 빌드를 세우지는 않는다.
 if [[ -f "$ICON_SRC" ]] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
   ICONSET="$(mktemp -d)/AppIcon.iconset"
   mkdir -p "$ICONSET" "$APP/Contents/Resources"
-  while read -r size name; do
+  while read -r size name small; do
     [[ -n "$size" ]] || continue
-    sips -z "$size" "$size" "$ICON_SRC" --out "$ICONSET/$name.png" >/dev/null
+    source="$ICON_SRC"
+    [[ -n "$small" && -f "$ICON_SMALL_SRC" ]] && source="$ICON_SMALL_SRC"
+    sips -z "$size" "$size" "$source" --out "$ICONSET/$name.png" >/dev/null
   done <<'SIZES'
-16 icon_16x16
-32 icon_16x16@2x
-32 icon_32x32
-64 icon_32x32@2x
+16 icon_16x16 small
+32 icon_16x16@2x small
+32 icon_32x32 small
+64 icon_32x32@2x small
 128 icon_128x128
 256 icon_128x128@2x
 256 icon_256x256
