@@ -1,29 +1,47 @@
 import AppKit
 import Combine
-import ServiceManagement
 import SwiftUI
 
-final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var panel: OverlayPanel!
     private let store = UsageStore()
     private let updater = Updater()
+    private let settings = Settings.shared
     private var cancellables = Set<AnyCancellable>()
+    private lazy var details = DetailsPanel(details: DetailsView(
+        store: store,
+        refresh: { [weak self] in self?.store.refresh() },
+        resetOverlayPosition: { [weak self] in self?.resetOverlayPosition() },
+        openSettings: { [weak self] in self?.openSettings() },
+        quit: { NSApp.terminate(nil) }))
+    private lazy var settingsWindow = SettingsWindowController(
+        store: store, updater: updater,
+        actions: SettingsActions(refresh: { [weak self] in self?.store.refresh() },
+                                 checkForUpdates: { [weak self] in self?.checkForUpdates() },
+                                 openReleaseNotes: { [weak self] in self?.openReleasesPage() },
+                                 resetOverlayPosition: { [weak self] in self?.resetOverlayPosition() }))
     /// 내용이 달라졌을 때만 메뉴바 이미지와 툴팁을 교체한다.
     private var renderedParts: [MenuBarPart] = []
     private var renderedTooltip: String?
+    /// 바뀐 설정이 CLI 조회나 업데이트 검사에 닿을 때만 그쪽을 깨운다.
+    private var configuration = UsageStore.Configuration.preferences
+    private var autoUpdate = Settings.shared.autoUpdate
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        Prefs.registerDefaults()
+        NSApp.mainMenu = makeMainMenu()
 
         panel = OverlayPanel(store: store)
-        panel.setVisible(Prefs.overlayVisible)
+        panel.apply(settings)
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem.button?.imagePosition = .imageOnly
-        let menu = NSMenu()
-        menu.delegate = self
-        statusItem.menu = menu
+        if let button = statusItem.button {
+            button.imagePosition = .imageOnly
+            button.target = self
+            button.action = #selector(statusItemClicked)
+            // 오른쪽 클릭은 짧은 메뉴로 받는다. 상세 창을 거치지 않고 설정과 종료에 닿는다.
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        }
         updateStatusItem()
 
         // 스냅샷과 분 단위 시계에 반응한다.
@@ -32,6 +50,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             .merge(with: store.$now.map { _ in () })
             .receive(on: RunLoop.main)
             .sink { [weak self] in self?.updateStatusItem() }
+            .store(in: &cancellables)
+
+        // objectWillChange 는 값이 바뀌기 직전에 울린다. 다음 차례로 미뤄 바뀐 값을 읽는다.
+        settings.objectWillChange
+            .receive(on: RunLoop.main)
+            .sink { [weak self] in self?.settingsChanged() }
             .store(in: &cancellables)
 
         observeWorkspaceActivity()
@@ -65,241 +89,128 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
-    /// 메뉴바 그림과 툴팁을 현재 설정에 맞춰 다시 만든다.
-    private func updateStatusItem() {
-        let parts = MenuBarText.parts(for: store.snapshot, now: store.now)
-        if parts != renderedParts {
-            renderedParts = parts
-            statusItem.button?.image = StatusBarImage.make(parts)
+    /// 설정 창에서 무엇이든 바뀌면 불린다. 그리는 쪽은 모두 다시 그리고,
+    /// 공급자나 조회 주기처럼 CLI 에 닿는 값이 바뀌었을 때만 조회 쪽을 깨운다.
+    private func settingsChanged() {
+        updateStatusItem(force: true)
+        panel.apply(settings)
+        let next = UsageStore.Configuration.preferences
+        if next != configuration {
+            configuration = next
+            store.settingsChanged()
         }
-        let tooltip = MenuBarText.tooltip(for: store.snapshot, now: store.now)
+        if settings.autoUpdate != autoUpdate {
+            autoUpdate = settings.autoUpdate
+            updater.settingsChanged()
+        }
+    }
+
+    /// 메뉴바 그림과 툴팁을 현재 설정에 맞춰 다시 만든다.
+    /// 글꼴 · 간격 · 색은 조각에 담기지 않으므로 설정이 바뀌었을 때는 조각이 같아도 다시 그린다.
+    private func updateStatusItem(force: Bool = false) {
+        guard let button = statusItem.button else { return }
+        let parts = MenuBarText.parts(for: store.snapshot, now: store.now)
+        if force || parts != renderedParts {
+            renderedParts = parts
+            button.image = StatusBarImage.make(parts)
+        }
+        let tooltip = settings.menuBarTooltip ? MenuBarText.tooltip(for: store.snapshot, now: store.now) : nil
         if tooltip != renderedTooltip {
             renderedTooltip = tooltip
-            statusItem.button?.toolTip = tooltip
+            button.toolTip = tooltip
         }
     }
 
-    // MARK: - 메뉴
+    // MARK: - 메뉴바 클릭
 
-    func menuNeedsUpdate(_ menu: NSMenu) {
-        menu.removeAllItems()
-
-        add(to: menu, "Refresh Now", #selector(refreshNow), key: "r")
-
-        menu.addItem(.sectionHeader(title: "Overlay"))
-        add(to: menu, "Show Overlay", #selector(toggleOverlay), state: Prefs.overlayVisible)
-        addSubmenu(to: menu, "Providers") { submenu in
-            add(to: submenu, "Claude", #selector(toggleOverlayClaude), state: Prefs.overlayClaude)
-            add(to: submenu, "Codex", #selector(toggleOverlayCodex), state: Prefs.overlayCodex)
+    @objc private func statusItemClicked() {
+        if NSApp.currentEvent?.type == .rightMouseUp {
+            showQuickMenu()
+        } else {
+            toggleDetails()
         }
-        add(to: menu, "Click Through", #selector(toggleClickThrough), state: Prefs.clickThrough)
-        addSubmenu(to: menu, "Opacity") { submenu in
-            for value in [1.0, 0.85, 0.7, 0.5] {
-                addChoice(to: submenu, "\(Int(value * 100))%", #selector(setOpacity(_:)),
-                          value: value, selected: abs(Prefs.opacity - value) < 0.01)
-            }
+    }
+
+    private func toggleDetails() {
+        guard let button = statusItem.button else { return }
+        if details.isVisible || details.justDismissed {
+            details.dismiss()
+        } else {
+            details.show(below: button)
         }
-        add(to: menu, "Reset Position", #selector(resetPosition))
+    }
 
-        menu.addItem(.sectionHeader(title: "Settings"))
-        addSubmenu(to: menu, "Menu Bar") { submenu in
-            submenu.addItem(.sectionHeader(title: "Providers"))
-            add(to: submenu, "Claude", #selector(toggleMenuBarClaude), state: Prefs.menuBarClaude)
-            add(to: submenu, "Codex", #selector(toggleMenuBarCodex), state: Prefs.menuBarCodex)
-
-            submenu.addItem(.sectionHeader(title: "Window"))
-            for window in MenuBarWindow.allCases {
-                addChoice(to: submenu, window.title, #selector(setMenuBarWindow(_:)),
-                          value: window.rawValue, selected: Prefs.menuBarWindow == window)
-            }
-
-            submenu.addItem(.sectionHeader(title: "Value"))
-            for value in MenuBarValue.allCases {
-                addChoice(to: submenu, value.title, #selector(setMenuBarValue(_:)),
-                          value: value.rawValue, selected: Prefs.menuBarValue == value)
-            }
-
-            submenu.addItem(.sectionHeader(title: "Details"))
-            add(to: submenu, "Window Label", #selector(toggleMenuBarLabel), state: Prefs.menuBarLabel)
-            add(to: submenu, "Provider Icon", #selector(toggleMenuBarIcon), state: Prefs.menuBarIcon)
-            add(to: submenu, "Reset Time", #selector(toggleMenuBarReset), state: Prefs.menuBarReset)
-        }
-        addSubmenu(to: menu, "Refresh Interval") { submenu in
-            for seconds in [30, 60, 300, 600, 1800] {
-                addChoice(to: submenu, Self.intervalLabel(seconds), #selector(setInterval(_:)),
-                          value: seconds, selected: Prefs.refreshSeconds == seconds)
-            }
-        }
-        add(to: menu, "Launch at Login", #selector(toggleLaunchAtLogin),
-            state: SMAppService.mainApp.status == .enabled)
-        addSubmenu(to: menu, "Updates") { submenu in
-            submenu.addItem(.sectionHeader(title: updater.currentVersion.map { "Version \($0)" }
-                ?? "Development build"))
-            switch updater.status {
-            case .idle: add(to: submenu, "Check Now", #selector(checkForUpdates))
-            case .checking: addStatus(to: submenu, "Checking\u{2026}")
-            case .downloading: addStatus(to: submenu, "Downloading update\u{2026}")
-            }
-            add(to: submenu, "Check Automatically", #selector(toggleAutoUpdate), state: Prefs.autoUpdate)
-            add(to: submenu, "Release Notes", #selector(openReleasesPage))
-        }
-
+    private func showQuickMenu() {
+        guard let button = statusItem.button else { return }
+        let menu = NSMenu()
+        menu.addItem(item("Refresh Now", #selector(refreshNow), key: "r"))
+        menu.addItem(item("Settings…", #selector(openSettings), key: ","))
         menu.addItem(.separator())
-        add(to: menu, "Quit", #selector(quit), key: "q")
+        menu.addItem(item("Quit", #selector(quit), key: "q"))
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.height + 5), in: button)
     }
 
-    private static func intervalLabel(_ seconds: Int) -> String {
-        seconds < 60 ? "\(seconds)s" : "\(seconds / 60) min"
+    /// 설정 창을 띄우는 동안 보이는 메뉴. 평소엔 메뉴바 앱이라 안 보이지만,
+    /// 이게 있어야 글상자에서 ⌘V 로 붙이고 ⌘W 로 창을 닫는다.
+    private func makeMainMenu() -> NSMenu {
+        let app = NSMenu(title: "Usage Overlay")
+        app.addItem(item("Settings…", #selector(openSettings), key: ","))
+        app.addItem(.separator())
+        app.addItem(item("Quit Usage Overlay", #selector(quit), key: "q"))
+
+        let edit = NSMenu(title: "Edit")
+        edit.addItem(NSMenuItem(title: "Undo", action: Selector(("undo:")), keyEquivalent: "z"))
+        let redo = NSMenuItem(title: "Redo", action: Selector(("redo:")), keyEquivalent: "z")
+        redo.keyEquivalentModifierMask = [.command, .shift]
+        edit.addItem(redo)
+        edit.addItem(.separator())
+        edit.addItem(NSMenuItem(title: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x"))
+        edit.addItem(NSMenuItem(title: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c"))
+        edit.addItem(NSMenuItem(title: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v"))
+        edit.addItem(NSMenuItem(title: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a"))
+
+        let window = NSMenu(title: "Window")
+        window.addItem(NSMenuItem(title: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w"))
+        window.addItem(NSMenuItem(title: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)),
+                                  keyEquivalent: "m"))
+        NSApp.windowsMenu = window
+
+        let main = NSMenu()
+        for menu in [app, edit, window] {
+            let holder = NSMenuItem(title: menu.title, action: nil, keyEquivalent: "")
+            holder.submenu = menu
+            main.addItem(holder)
+        }
+        return main
     }
 
-    @discardableResult
-    private func add(to menu: NSMenu, _ title: String, _ action: Selector,
-                     key: String = "", state: Bool? = nil) -> NSMenuItem {
+    private func item(_ title: String, _ action: Selector, key: String = "") -> NSMenuItem {
         let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
         item.target = self
-        if let state { item.state = state ? .on : .off }
-        menu.addItem(item)
         return item
     }
 
-    /// 값 하나를 고르는 줄. 고른 값은 representedObject 로 실어 보낸다.
-    private func addChoice(to menu: NSMenu, _ title: String, _ action: Selector,
-                           value: Any, selected: Bool) {
-        add(to: menu, title, action, state: selected).representedObject = value
-    }
-
-    /// 누를 수 없는 안내 줄. 진행 중인 일을 그 자리에 그대로 보여 준다.
-    private func addStatus(to menu: NSMenu, _ title: String) {
-        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
-        item.isEnabled = false
-        menu.addItem(item)
-    }
-
-    private func addSubmenu(to menu: NSMenu, _ title: String, _ build: (NSMenu) -> Void) {
-        let submenu = NSMenu()
-        build(submenu)
-        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
-        item.submenu = submenu
-        menu.addItem(item)
-    }
-
-    @objc private func toggleOverlay() {
-        Prefs.overlayVisible.toggle()
-        panel.setVisible(Prefs.overlayVisible)
-    }
-
-    @objc private func toggleClickThrough() {
-        panel.setClickThrough(!Prefs.clickThrough)
-    }
-
-    @objc private func setOpacity(_ sender: NSMenuItem) {
-        guard let value = sender.representedObject as? Double else { return }
-        Prefs.opacity = value
-        panel.alphaValue = value
-    }
-
-    @objc private func setInterval(_ sender: NSMenuItem) {
-        guard let seconds = sender.representedObject as? Int else { return }
-        Prefs.refreshSeconds = seconds
-        store.settingsChanged()
-    }
-
-    // MARK: - 공급자 표시 설정
-
-    @objc private func toggleOverlayClaude() {
-        Prefs.overlayClaude.toggle()
-        providersChanged()
-    }
-
-    @objc private func toggleOverlayCodex() {
-        Prefs.overlayCodex.toggle()
-        providersChanged()
-    }
-
-    @objc private func toggleMenuBarClaude() {
-        Prefs.menuBarClaude.toggle()
-        providersChanged()
-    }
-
-    @objc private func toggleMenuBarCodex() {
-        Prefs.menuBarCodex.toggle()
-        providersChanged()
-    }
-
-    /// 꺼 두었던 공급자는 스냅샷이 비어 있다. 다시 켜면 다음 주기까지 기다리지 않고 바로 읽어 온다.
-    private func providersChanged() {
-        store.settingsChanged()
-        updateStatusItem()
-        panel.reload()
-    }
-
-    // MARK: - 메뉴바 표시 설정
-
-    @objc private func setMenuBarWindow(_ sender: NSMenuItem) {
-        guard let raw = sender.representedObject as? String,
-              let window = MenuBarWindow(rawValue: raw) else { return }
-        Prefs.menuBarWindow = window
-        updateStatusItem()
-    }
-
-    @objc private func setMenuBarValue(_ sender: NSMenuItem) {
-        guard let raw = sender.representedObject as? String,
-              let value = MenuBarValue(rawValue: raw) else { return }
-        Prefs.menuBarValue = value
-        updateStatusItem()
-    }
-
-    @objc private func toggleMenuBarLabel() {
-        Prefs.menuBarLabel.toggle()
-        updateStatusItem()
-    }
-
-    @objc private func toggleMenuBarIcon() {
-        Prefs.menuBarIcon.toggle()
-        updateStatusItem()
-    }
-
-    @objc private func toggleMenuBarReset() {
-        Prefs.menuBarReset.toggle()
-        updateStatusItem()
-    }
-
-    // MARK: - 읽기
+    // MARK: - 동작
 
     @objc private func refreshNow() { store.refresh() }
 
-    @objc private func resetPosition() {
-        panel.resetPosition()
-        if !Prefs.overlayVisible { toggleOverlay() }
-    }
-
-    @objc private func toggleLaunchAtLogin() {
-        do {
-            if SMAppService.mainApp.status == .enabled {
-                try SMAppService.mainApp.unregister()
-            } else {
-                try SMAppService.mainApp.register()
-            }
-        } catch {
-            let alert = NSAlert()
-            alert.messageText = "Couldn't change Launch at Login"
-            alert.informativeText = "\(error.localizedDescription)\nTry moving the app to /Applications first."
-            alert.runModal()
-        }
+    @objc private func openSettings() {
+        details.dismiss()
+        settingsWindow.show()
     }
 
     @objc private func quit() { NSApp.terminate(nil) }
 
-    // MARK: - 업데이트
-
-    @objc private func checkForUpdates() { updater.check(userInitiated: true) }
-
-    @objc private func toggleAutoUpdate() {
-        Prefs.autoUpdate.toggle()
-        updater.settingsChanged()
+    private func resetOverlayPosition() {
+        panel.resetPosition()
+        if !settings.overlayVisible { settings.overlayVisible = true }
     }
 
-    @objc private func openReleasesPage() { NSWorkspace.shared.open(Updater.releasesPage) }
+    // MARK: - 업데이트
+
+    private func checkForUpdates() { updater.check(userInitiated: true) }
+
+    private func openReleasesPage() { NSWorkspace.shared.open(Updater.releasesPage) }
 
     /// 자동 검사는 새 버전을 찾았을 때만 말을 건다. 직접 눌렀을 때는 결과가 무엇이든 답한다.
     private func checkFinished(_ outcome: Updater.Outcome, userInitiated: Bool) {

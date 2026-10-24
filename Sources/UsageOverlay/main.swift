@@ -1,7 +1,5 @@
 import AppKit
 
-Prefs.registerDefaults()
-
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate

@@ -7,7 +7,8 @@ final class OverlayPanel: NSPanel {
     /// 안 그러면 내용 크기가 확정되기 전의 임시 좌표가 저장돼 버린다.
     private var isPositioning = false
     private let store: UsageStore
-    private var revision = 0
+    /// 띄워 둔 상태. 다른 Space 에 가 있으면 `isVisible` 이 거짓이라 따로 센다.
+    private var shown = false
 
     init(store: UsageStore) {
         self.store = store
@@ -19,15 +20,8 @@ final class OverlayPanel: NSPanel {
         isOpaque = false
         backgroundColor = .clear
         hasShadow = true
-        level = .floating
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
-        // macOS 27 부터는 OverlayView 의 WindowDragGesture 가 끈다. 둘 다 켜 두면 한 번 끌 때 두 번 움직일 수 있다.
-        if #unavailable(macOS 27) {
-            isMovableByWindowBackground = true
-        }
         hidesOnDeactivate = false
         isReleasedWhenClosed = false
-        ignoresMouseEvents = Prefs.clickThrough
 
         NotificationCenter.default.addObserver(self, selector: #selector(didMove),
                                                name: NSWindow.didMoveNotification, object: self)
@@ -42,11 +36,26 @@ final class OverlayPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
 
+    /// 창의 성질을 설정에 맞춘다. 내용은 OverlayView 가 설정을 직접 따라 그린다.
+    func apply(_ settings: Settings) {
+        ignoresMouseEvents = settings.overlayClickThrough
+        level = settings.overlayAlwaysOnTop ? .floating : .normal
+        collectionBehavior = settings.overlayAllSpaces
+            ? [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
+            : [.ignoresCycle]
+        // macOS 27 부터는 OverlayView 의 WindowDragGesture 가 끈다. 둘 다 켜 두면 한 번 끌 때 두 번 움직일 수 있다.
+        if #unavailable(macOS 27) {
+            isMovableByWindowBackground = !settings.overlayLocked
+        }
+        if settings.overlayVisible != shown { setVisible(settings.overlayVisible) }
+    }
+
     /// 숨긴 패널이 시계와 스냅샷을 구독하며 레이아웃을 계산하지 않도록 뷰도 해제한다.
-    func setVisible(_ visible: Bool) {
+    private func setVisible(_ visible: Bool) {
+        shown = visible
         if visible {
             if contentViewController == nil {
-                let hosting = NSHostingController(rootView: OverlayView(store: store, revision: revision))
+                let hosting = NSHostingController(rootView: OverlayView(store: store))
                 hosting.sizingOptions = [.preferredContentSize]
                 contentViewController = hosting
             }
@@ -60,14 +69,6 @@ final class OverlayPanel: NSPanel {
         }
     }
 
-    /// 표시 설정이 바뀌었을 때. OverlayView 는 Prefs 를 직접 읽어서 SwiftUI 가 변화를 못 보므로
-    /// 값이 달라진 rootView 를 새로 물려 다시 그리게 한다. 창 높이는 내용에 따라 알아서 따라온다.
-    func reload() {
-        revision += 1
-        (contentViewController as? NSHostingController<OverlayView>)?.rootView =
-            OverlayView(store: store, revision: revision)
-    }
-
     func applyStoredPosition() {
         isPositioning = true
         setFrameTopLeftPoint(Prefs.topLeft ?? defaultTopLeft())
@@ -77,11 +78,6 @@ final class OverlayPanel: NSPanel {
     func resetPosition() {
         Prefs.topLeft = nil
         setFrameTopLeftPoint(defaultTopLeft())
-    }
-
-    func setClickThrough(_ on: Bool) {
-        Prefs.clickThrough = on
-        ignoresMouseEvents = on
     }
 
     /// 주 화면(메뉴바가 있는 화면) 오른쪽 위 모서리.

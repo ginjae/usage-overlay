@@ -10,14 +10,16 @@ final class UsageStore: ObservableObject {
     /// 조회 중임을 표시하고 중복 요청을 막는다.
     @Published private(set) var isRefreshing = false
 
-    struct Configuration {
+    struct Configuration: Equatable {
         var claude: Bool
         var codex: Bool
         var interval: TimeInterval
 
         static var preferences: Self {
-            Self(claude: Prefs.readClaude, codex: Prefs.readCodex,
-                 interval: TimeInterval(Prefs.refreshSeconds))
+            let settings = Settings.shared
+            // 갱신마다 CLI를 두 개 띄우고 서버에 물어본다. 너무 잦으면 얻는 것 없이 시끄럽다.
+            return Self(claude: settings.reads(.claude), codex: settings.reads(.codex),
+                        interval: TimeInterval(max(30, settings.refreshSeconds)))
         }
 
         var hasProviders: Bool { claude || codex }

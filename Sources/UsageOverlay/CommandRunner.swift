@@ -13,6 +13,11 @@ enum CommandRunner {
 
     /// 이름으로 실행 파일을 찾는다. 없으면 nil.
     static func executable(_ name: String) -> URL? {
+        // 직접 지정한 경로가 먼저다. 설정 창에서 바꾸면 캐시를 거치지 않고 다음 조회부터 바로 따른다.
+        if let override = Settings.shared.path(for: name),
+           FileManager.default.isExecutableFile(atPath: override) {
+            return URL(fileURLWithPath: override)
+        }
         lock.lock()
         defer { lock.unlock() }
         // 지웠다 다시 깔면 경로가 바뀔 수 있어 캐시도 존재 여부를 확인한다.
@@ -24,14 +29,9 @@ enum CommandRunner {
         return found
     }
 
+    /// 여기 없는 곳에 깔았다면 설정 창 General 에서 경로를 직접 지정한다.
     private static func search(_ name: String) -> URL? {
-        // 여기 없는 곳에 깔았을 때의 탈출구. 재빌드 없이 지정할 수 있다.
-        //   defaults write io.github.ginjae.usage-overlay path.claude '/opt/homebrew/bin/claude'
-        if let override = Prefs.path(for: name),
-           FileManager.default.isExecutableFile(atPath: override) {
-            return URL(fileURLWithPath: override)
-        }
-        return searchDirectories
+        searchDirectories
             .map { $0.appendingPathComponent(name) }
             .first { FileManager.default.isExecutableFile(atPath: $0.path) }
     }

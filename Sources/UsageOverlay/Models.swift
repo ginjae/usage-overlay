@@ -22,6 +22,25 @@ struct Gauge: Identifiable, Equatable {
         }
     }
 
+    /// 창 시간 가운데 지난 몫(0...1). 리셋 시각이나 창 길이를 모르면 낼 수 없다.
+    func elapsedFraction(at now: Date) -> Double? {
+        guard let resetsAt, let windowMinutes, windowMinutes > 0 else { return nil }
+        let left = resetsAt.timeIntervalSince(now) / (windowMinutes * 60)
+        return min(max(1 - left, 0), 1)
+    }
+
+    /// 지금 속도를 그대로 이어 가면 어떻게 되는지. 창 초반에는 표본이 적어 들쭉날쭉하므로 조금 지난 뒤부터 낸다.
+    func pace(at now: Date) -> Pace? {
+        guard let resetsAt, let windowMinutes, let elapsed = elapsedFraction(at: now),
+              elapsed >= 0.05, elapsed < 1 else { return nil }
+        guard percent < 100 else { return .runsOut(at: now) }
+        guard percent > 0 else { return .lasts(usedAtReset: 0) }
+        // 쓴 양을 지난 시간으로 나눈 속도로 남은 양을 다 쓰는 데 걸리는 시간.
+        let secondsToEmpty = (100 - percent) / (percent / (elapsed * windowMinutes * 60))
+        let empty = now.addingTimeInterval(secondsToEmpty)
+        return empty < resetsAt ? .runsOut(at: empty) : .lasts(usedAtReset: min(100, percent / elapsed))
+    }
+
     /// 메뉴바용 짧은 라벨. 폭이 곧 다른 앱의 자리라 창 길이만 남긴다. "5-hour" → "5h".
     var shortLabel: String {
         switch label {
@@ -32,6 +51,13 @@ struct Gauge: Identifiable, Equatable {
         default: return label
         }
     }
+}
+
+enum Pace: Equatable {
+    /// 리셋 전에 한도를 다 쓴다.
+    case runsOut(at: Date)
+    /// 리셋까지 버틴다. 그때까지 쓸 양(%).
+    case lasts(usedAtReset: Double)
 }
 
 /// 한 공급자(Claude / Codex)의 사용량 스냅샷.
@@ -50,18 +76,38 @@ struct ProviderUsage: Equatable {
 struct Snapshot: Equatable {
     var claude: ProviderUsage?
     var codex: ProviderUsage?
+
+    /// 숫자가 하나라도 있는지. 첫 조회가 끝나기 전에는 없다.
+    var hasGauges: Bool { [claude, codex].contains { $0?.gauges.isEmpty == false } }
 }
 
 enum Format {
-    /// 남은 시간을 "3d 4h" / "1h 20m" / "45m" 형태로.
-    static func remaining(until date: Date?, from now: Date) -> String {
+    /// 남은 시간을 "3d 4h" / "1h 20m" / "45m" 형태로. `units` 가 1 이면 큰 단위 하나만 "3d" / "1h".
+    static func remaining(until date: Date?, from now: Date, units: Int = 2) -> String {
         guard let date else { return "—" }
         let s = Int(date.timeIntervalSince(now))
         if s <= 0 { return "soon" }
         let d = s / 86400, h = (s % 86400) / 3600, m = (s % 3600) / 60
-        if d > 0 { return h > 0 ? "\(d)d \(h)h" : "\(d)d" }
-        if h > 0 { return "\(h)h \(m)m" }
+        if d > 0 { return units > 1 && h > 0 ? "\(d)d \(h)h" : "\(d)d" }
+        if h > 0 { return units > 1 ? "\(h)h \(m)m" : "\(h)h" }
         return "\(m)m"
+    }
+
+    /// 리셋 시각. 오늘이면 시각만, 한 주 안이면 요일을, 그 너머면 날짜를 붙인다.
+    static func clock(_ date: Date, from now: Date) -> String {
+        let calendar = Calendar.current
+        if calendar.isDate(date, inSameDayAs: now) { return date.formatted(date: .omitted, time: .shortened) }
+        if date.timeIntervalSince(now) < 6 * 86400 {
+            return date.formatted(.dateTime.weekday(.abbreviated).hour().minute())
+        }
+        return date.formatted(.dateTime.month(.abbreviated).day().hour().minute())
+    }
+
+    /// 보여 주는 값 가운데 가장 오래된 것의 나이. 늘 떠 있는 자리라 조용하면 멈춘 건지 최신인 건지 알 수 없다.
+    static func freshness(of usages: [ProviderUsage], from now: Date) -> String {
+        guard !usages.isEmpty else { return "Loading…" }
+        guard let oldest = usages.compactMap(\.updatedAt).min() else { return "Updated —" }
+        return "Updated " + since(oldest, from: now)
     }
 
     /// 마지막 갱신 시점을 "just now" / "3m ago" 형태로. 늘 떠 있는 자리라 초 단위로 떨지 않게 한다.

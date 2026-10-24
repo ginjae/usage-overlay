@@ -2,59 +2,56 @@ import SwiftUI
 
 struct OverlayView: View {
     @ObservedObject var store: UsageStore
-    /// 뷰가 Prefs 를 직접 읽으므로 SwiftUI 는 설정이 바뀐 걸 알 수 없다.
-    /// 패널이 이 값을 올려 주면 그때 다시 그린다.
-    var revision: Int = 0
+    @ObservedObject var settings = Settings.shared
 
-    /// Claude 브랜드 주황. Codex는 로고가 단색이라 본문 색을 그대로 쓴다.
-    private let claudeAccent = Color(red: 0.85, green: 0.45, blue: 0.28)
+    private var providers: [Provider] {
+        settings.providerOrder.providers.filter { settings[keyPath: $0.overlayShown] }
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 11) {
-            if Prefs.overlayClaude {
-                ProviderBlock(usage: store.snapshot.claude,
-                              fallbackName: "Claude",
-                              icon: Icons.claude,
-                              accent: claudeAccent)
-            }
-            if Prefs.overlayCodex {
-                ProviderBlock(usage: store.snapshot.codex,
-                              fallbackName: "Codex",
-                              icon: Icons.codex,
-                              accent: .primary)
+        let scale = settings.overlayScale
+        VStack(alignment: .leading, spacing: 11 * scale) {
+            ForEach(providers, id: \.self) { provider in
+                ProviderBlock(provider: provider, usage: provider.usage(in: store.snapshot))
             }
             // 둘 다 끄면 바닥글만 남아 빈 상자처럼 보인다. 고장이 아니라는 것만 알려 준다.
-            if !Prefs.overlayClaude, !Prefs.overlayCodex {
+            if providers.isEmpty {
                 Text("No providers shown")
-                    .font(.system(size: 9.5))
+                    .font(.system(size: 9.5 * scale))
                     .foregroundStyle(.secondary)
             }
-            footer
+            if settings.overlayFooter { footer }
         }
         .environment(\.now, store.now)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 11)
-        .frame(width: 244, alignment: .leading)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 13, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.13), lineWidth: 1)
-        )
-        .opacity(Prefs.opacity)
-        .modifier(WindowDrag())
+        .padding(.horizontal, 12 * scale)
+        .padding(.vertical, 11 * scale)
+        .frame(width: settings.overlayWidth, alignment: .leading)
+        .background(settings.overlayBackground.style, in: shape)
+        .overlay {
+            if settings.overlayBorder {
+                shape.strokeBorder(Color.white.opacity(0.13), lineWidth: 1)
+            }
+        }
+        .opacity(settings.overlayOpacity)
+        .modifier(WindowDrag(enabled: !settings.overlayLocked))
+    }
+
+    private var shape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: settings.overlayCornerRadius, style: .continuous)
     }
 
     private var footer: some View {
-        HStack(spacing: 4) {
+        let scale = settings.overlayScale
+        return HStack(spacing: 4) {
             Text(freshness)
-                .font(.system(size: 9))
+                .font(.system(size: 9 * scale))
                 .foregroundStyle(.tertiary)
             Spacer(minLength: 4)
             Button(action: { store.refresh() }) {
                 Image(systemName: store.isRefreshing ? "hourglass" : "arrow.clockwise")
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(.system(size: 9 * scale, weight: .semibold))
                     .foregroundStyle(.secondary)
-                    .frame(width: 14, height: 14)
+                    .frame(width: 14 * scale, height: 14 * scale)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -66,12 +63,7 @@ struct OverlayView: View {
 
     /// 값이 언제 것인지 늘 띄운다. 조용하면 멈춘 건지 최신인 건지 알 수 없다.
     private var freshness: String {
-        let shown = [Prefs.overlayClaude ? store.snapshot.claude : nil,
-                     Prefs.overlayCodex ? store.snapshot.codex : nil]
-        let providers = shown.compactMap { $0 }
-        guard !providers.isEmpty else { return "Loading…" }
-        guard let oldest = providers.compactMap(\.updatedAt).min() else { return "Updated —" }
-        return "Updated " + Format.since(oldest, from: store.now)
+        Format.freshness(of: providers.compactMap { $0.usage(in: store.snapshot) }, from: store.now)
     }
 }
 
@@ -80,13 +72,19 @@ struct OverlayView: View {
 /// `isMovableByWindowBackground` 만으로는 창이 끌리지 않는다.
 /// 다른 앱을 쓰다 돌아온 첫 클릭은 패널을 key 로 만드는 데만 쓰여 제스처가 무시되므로,
 /// 그 클릭으로도 바로 끌리도록 활성화 이벤트를 받는다.
-/// 26 까지는 패널의 배경 드래그가 잘 되므로 그쪽은 건드리지 않는다.
+/// 26 까지는 패널의 배경 드래그가 잘 되므로 그쪽은 건드리지 않는다. 위치를 잠그면 어느 쪽도 끌지 않는다.
 private struct WindowDrag: ViewModifier {
+    let enabled: Bool
+
     @ViewBuilder func body(content: Content) -> some View {
         if #available(macOS 27, *) {
-            content
-                .gesture(WindowDragGesture())
-                .allowsWindowActivationEvents(true)
+            if enabled {
+                content
+                    .gesture(WindowDragGesture())
+                    .allowsWindowActivationEvents(true)
+            } else {
+                content
+            }
         } else {
             content
         }
@@ -106,37 +104,40 @@ extension EnvironmentValues {
 }
 
 private struct ProviderBlock: View {
+    @ObservedObject var settings = Settings.shared
+    let provider: Provider
     let usage: ProviderUsage?
-    let fallbackName: String
-    let icon: NSImage
-    let accent: Color
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 5) {
-                Image(nsImage: icon)
-                    .resizable()
-                    .renderingMode(.template)
-                    .interpolation(.high)
-                    .frame(width: 11, height: 11)
-                    .foregroundStyle(accent)
-                Text(usage?.name ?? fallbackName)
-                    .font(.system(size: 11, weight: .semibold))
-                Spacer(minLength: 4)
-                if let plan = usage?.plan {
-                    Text(plan)
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(.secondary)
+        let scale = settings.overlayScale
+        let gauges = usage.map { settings[keyPath: provider.overlayWindow].pick(from: $0.gauges) } ?? []
+        VStack(alignment: .leading, spacing: 5 * scale) {
+            if settings.overlayHeader {
+                HStack(spacing: 5 * scale) {
+                    Image(nsImage: provider.icon)
+                        .resizable()
+                        .renderingMode(.template)
+                        .interpolation(.high)
+                        .frame(width: 11 * scale, height: 11 * scale)
+                        .foregroundStyle(settings[keyPath: provider.accent].color)
+                    Text(usage?.name ?? provider.name)
+                        .font(.system(size: 11 * scale, weight: .semibold))
+                    Spacer(minLength: 4)
+                    if settings.overlayPlan, let plan = usage?.plan {
+                        Text(plan)
+                            .font(.system(size: 9 * scale, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
 
-            if let gauges = usage?.gauges, !gauges.isEmpty {
+            if !gauges.isEmpty {
                 ForEach(gauges) { gauge in
                     GaugeRow(gauge: gauge)
                 }
             } else {
                 Text(usage?.note ?? "Loading…")
-                    .font(.system(size: 9.5))
+                    .font(.system(size: 9.5 * scale))
                     .foregroundStyle(.secondary)
             }
         }
@@ -145,43 +146,58 @@ private struct ProviderBlock: View {
 
 private struct GaugeRow: View {
     @Environment(\.now) private var now
+    @ObservedObject var settings = Settings.shared
     let gauge: Gauge
 
-    /// API는 "쓴 양"을 주지만 화면에는 "남은 양"을 보여 준다.
-    /// 모델은 원본 의미를 그대로 두고 표시 단계에서만 뒤집는다.
-    private var remaining: Double { max(0, 100 - gauge.percent) }
-    private var fraction: Double { min(max(remaining / 100, 0), 1) }
+    var body: some View {
+        let scale = settings.overlayScale
+        // API는 "쓴 양"을 준다. 모델은 원본 의미를 그대로 두고, 남은 양으로 볼지는 표시 단계에서만 고른다.
+        let value = settings.overlayValue.percent(of: gauge)
+        HStack(spacing: 6 * scale) {
+            if settings.overlayLabels {
+                Text(gauge.label)
+                    .font(.system(size: 9.5 * scale))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 46 * scale, alignment: .leading)
+            }
 
-    private var color: Color {
-        switch remaining {
-        case ..<20: return Color(red: 0.94, green: 0.38, blue: 0.34)
-        case ..<50: return Color(red: 0.95, green: 0.72, blue: 0.25)
-        default: return Color(red: 0.30, green: 0.78, blue: 0.47)
+            if settings.overlayBars {
+                UsageBar(fraction: value / 100, color: settings.levelColor(of: gauge).color,
+                         height: settings.overlayBarHeight)
+            } else {
+                Spacer(minLength: 0)
+            }
+
+            if settings.overlayPercent {
+                Text("\(Int(value.rounded()))%")
+                    .font(.system(size: 10 * scale, weight: .medium).monospacedDigit())
+                    .frame(width: 32 * scale, alignment: .trailing)
+            }
+
+            if settings.overlayCountdown {
+                Text(Format.remaining(until: gauge.resetsAt, from: now))
+                    .font(.system(size: 9.5 * scale).monospacedDigit())
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .frame(width: 46 * scale, alignment: .trailing)
+            }
         }
     }
+}
+
+/// 한도 막대. 오버레이와 상세 창이 같이 쓴다. 남은 양을 띄우면 줄어들고, 쓴 양을 띄우면 차오른다.
+struct UsageBar: View {
+    let fraction: Double
+    let color: Color
+    let height: CGFloat
 
     var body: some View {
-        HStack(spacing: 6) {
-            Text(gauge.label)
-                .font(.system(size: 9.5))
-                .foregroundStyle(.secondary)
-                .frame(width: 46, alignment: .leading)
-
+        GeometryReader { geometry in
             ZStack(alignment: .leading) {
                 Capsule().fill(Color.primary.opacity(0.12))
-                Capsule().fill(color).frame(width: 72 * fraction)
+                Capsule().fill(color).frame(width: geometry.size.width * min(max(fraction, 0), 1))
             }
-            .frame(width: 72, height: 5)
-
-            Text("\(Int(remaining.rounded()))%")
-                .font(.system(size: 10, weight: .medium).monospacedDigit())
-                .frame(width: 32, alignment: .trailing)
-
-            Text(Format.remaining(until: gauge.resetsAt, from: now))
-                .font(.system(size: 9.5).monospacedDigit())
-                .foregroundStyle(.tertiary)
-                .lineLimit(1)
-                .frame(width: 46, alignment: .trailing)
         }
+        .frame(height: height)
     }
 }

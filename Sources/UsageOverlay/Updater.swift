@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import CryptoKit
 import Foundation
 
@@ -105,7 +106,7 @@ struct Release: Sendable {
 /// 정작 바꿔치기하는 순간은 같은 볼륨 안의 mv 두 번이라 실패할 구석이 거의 없다.
 ///
 /// 공개 함수는 모두 메인에서 부른다. 오래 걸리는 일만 조회용 큐로 넘겼다가 메인으로 돌아온다.
-final class Updater {
+final class Updater: ObservableObject {
     enum Status { case idle, checking, downloading }
     enum Outcome { case found(Release), upToDate, failed(String) }
 
@@ -120,7 +121,8 @@ final class Updater {
     /// 내려받기는 사용량 조회보다 오래 걸린다. 회선이 느려도 끊기지 않게 넉넉히 준다.
     private static let downloadTimeout: TimeInterval = 300
 
-    private(set) var status: Status = .idle
+    /// 설정 창이 검사 중인지 보여 주려고 지켜본다.
+    @Published private(set) var status: Status = .idle
     /// 검사 결과를 넘기는 자리. 알림창을 띄우는 일은 AppDelegate가 한다.
     var onCheckFinished: ((Outcome, _ userInitiated: Bool) -> Void)?
 
@@ -173,7 +175,7 @@ final class Updater {
     private func scheduleCheck() {
         timer?.invalidate()
         timer = nil
-        guard Prefs.autoUpdate, unavailableReason == nil else { return }
+        guard Settings.shared.autoUpdate, unavailableReason == nil else { return }
         let due = (Prefs.lastUpdateCheck ?? .distantPast).addingTimeInterval(Self.checkInterval)
         // 뜨자마자 물으면 첫 사용량 조회와 겹친다. 메뉴바가 자리를 잡은 뒤로 조금 미룬다.
         let delay = max(15, due.timeIntervalSinceNow)
