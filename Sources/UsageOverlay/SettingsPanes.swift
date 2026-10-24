@@ -177,6 +177,12 @@ struct MenuBarPane: View {
                               choices: [1, 2], label: { $0 == 1 ? "One unit (2h)" : "Two units (2h 10m)" })
                 }
                 if settings.menuBarReset.face != nil {
+                    ForEach(settings.providerOrder.providers, id: \.self) { provider in
+                        ChoiceRow(title: "\(provider.name) window", selection: $settings[dynamicMember: provider.menuBarClockWindow],
+                                  choices: provider.clockWindowChoices, label: \.title)
+                            .disabled(!settings[keyPath: provider.menuBarShown])
+                    }
+                    Caption("Choose each clock's window independently of the percentages. If that window is unavailable, its tightest window is used.")
                     ChoiceRow(title: "Lit part", selection: $settings.menuBarClockFill,
                               choices: ClockFill.allCases, label: \.title)
                     SliderRow(title: "Unlit part", value: $settings.menuBarClockDim,
@@ -185,7 +191,7 @@ struct MenuBarPane: View {
                         SliderRow(title: "Ring thickness", value: $settings.menuBarRingWidth,
                                   range: 0.5...3, step: 0.25)
                     }
-                    Caption("The clock follows the first window shown for each provider. Its hand turns clockwise from 12 as the window passes.")
+                    Caption("The hand turns clockwise from 12 as the selected window passes.")
                 }
             }
 
@@ -270,7 +276,7 @@ struct DetailsPane: View {
             Section("Preview") {
                 HStack {
                     Spacer()
-                    DetailsView(store: store, refresh: {}, resetOverlayPosition: {}, openSettings: {}, quit: {})
+                    DetailsView(store: store)
                         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
                         .allowsHitTesting(false)
                     Spacer()

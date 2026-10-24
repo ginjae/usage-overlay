@@ -77,13 +77,15 @@ enum MenuBarText {
         // 리셋 시각을 글자로 붙이면 조각 안이 이미 "39% · 2h 10m" 이라 가운뎃점을 또 찍지 않는다.
         let joint: MenuBarSeam = settings.menuBarReset == .countdown && settings.menuBarSeparator == .dot
             ? .plain : .window
+        let clockGauge = settings[keyPath: provider.menuBarClockWindow].pick(from: usage?.gauges ?? [], shown: gauges)
+        let providerClock = clockGauge.flatMap { clock(face, for: $0, now: now) }
         return gauges.enumerated().map { index, gauge in
             // 창을 여러 개 보여 줄 때 같은 아이콘이 반복되면 지저분하다. 공급자당 한 번만 붙인다.
-            // 시계도 그 로고에 하나뿐이라 바로 옆 첫 창의 시간을 그린다.
+            // 시계도 그 로고에 하나뿐이며, 공급자별로 고른 창의 시간을 그린다.
             MenuBarPart(icon: index == 0 ? badge : nil,
                         text: text(for: gauge, now: now),
                         seam: index == 0 ? .provider : joint,
-                        clock: index == 0 ? clock(face, for: gauge, now: now) : nil,
+                        clock: index == 0 ? providerClock : nil,
                         level: level(of: gauge))
         }
     }
@@ -98,7 +100,7 @@ enum MenuBarText {
         return text
     }
 
-    /// 퍼센트와 같은 쪽을 칠해야 둘을 나란히 놓고 견줄 수 있다.
+    /// 퍼센트와 같은 창을 골랐다면, 같은 쪽을 칠해 나란히 놓고 견줄 수 있다.
     /// 남은 양 39% 옆 로고가 절반 켜져 있으면 시간보다 한도가 빨리 줄고 있다는 뜻이다.
     private static func clock(_ face: LogoClock.Face?, for gauge: Gauge, now: Date) -> LogoClock? {
         guard let face, let elapsed = gauge.elapsedFraction(at: now) else { return nil }

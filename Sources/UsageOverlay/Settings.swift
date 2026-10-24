@@ -43,6 +43,9 @@ final class Settings: ObservableObject {
     @Pref("menuBarReset", .menuBar) var menuBarReset = MenuBarReset.off
     /// 카운트다운을 몇 단위까지 쓸지. 1 이면 `2h`, 2 면 `2h 10m`.
     @Pref("menuBar.countdownUnits", .menuBar) var menuBarCountdownUnits = 2
+    /// 시계는 퍼센트에 띄운 창과 따로 고를 수 있다. 기본은 예전처럼 첫 번째로 보이는 창을 따른다.
+    @Pref("menuBar.claude.clockWindow", .menuBar) var menuBarClaudeClockWindow = ClockWindowChoice.firstShown
+    @Pref("menuBar.codex.clockWindow", .menuBar) var menuBarCodexClockWindow = ClockWindowChoice.firstShown
     @Pref("menuBar.clockFill", .menuBar) var menuBarClockFill = ClockFill.matchPercent
     /// 시계에서 칠하지 않은 쪽의 진하기.
     @Pref("menuBar.clockDim", .menuBar) var menuBarClockDim = 0.3

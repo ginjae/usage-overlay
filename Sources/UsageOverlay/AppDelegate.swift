@@ -2,19 +2,16 @@ import AppKit
 import Combine
 import SwiftUI
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
     private var panel: OverlayPanel!
     private let store = UsageStore()
     private let updater = Updater()
     private let settings = Settings.shared
     private var cancellables = Set<AnyCancellable>()
-    private lazy var details = DetailsPanel(details: DetailsView(
-        store: store,
-        refresh: { [weak self] in self?.store.refresh() },
-        resetOverlayPosition: { [weak self] in self?.resetOverlayPosition() },
-        openSettings: { [weak self] in self?.openSettings() },
-        quit: { NSApp.terminate(nil) }))
+    /// 메뉴 윗부분에 그리는 사용량.
+    private lazy var details = NSHostingView(rootView: DetailsView(store: store))
+    private lazy var showOverlayItem = item("Show Overlay", #selector(toggleOverlay))
     private lazy var settingsWindow = SettingsWindowController(
         store: store, updater: updater,
         actions: SettingsActions(refresh: { [weak self] in self?.store.refresh() },
@@ -35,13 +32,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.apply(settings)
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        if let button = statusItem.button {
-            button.imagePosition = .imageOnly
-            button.target = self
-            button.action = #selector(statusItemClicked)
-            // 오른쪽 클릭은 짧은 메뉴로 받는다. 상세 창을 거치지 않고 설정과 종료에 닿는다.
-            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
-        }
+        statusItem.button?.imagePosition = .imageOnly
+        statusItem.menu = makeDetailsMenu()
         updateStatusItem()
 
         // 스냅샷과 분 단위 시계에 반응한다.
@@ -121,33 +113,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    // MARK: - 메뉴바 클릭
+    // MARK: - 메뉴바 메뉴
 
-    @objc private func statusItemClicked() {
-        if NSApp.currentEvent?.type == .rightMouseUp {
-            showQuickMenu()
-        } else {
-            toggleDetails()
-        }
-    }
-
-    private func toggleDetails() {
-        guard let button = statusItem.button else { return }
-        if details.isVisible || details.justDismissed {
-            details.dismiss()
-        } else {
-            details.show(below: button)
-        }
-    }
-
-    private func showQuickMenu() {
-        guard let button = statusItem.button else { return }
+    /// 메뉴바를 누르면 뜨는 메뉴. 새로고침 아래에 갱신 시각과 사용량, 나머지 메뉴 항목을 놓는다.
+    /// 시스템 메뉴라서 메뉴바 항목 강조 · 재질 · 위치 · 닫히는 방식이 다른 메뉴바 메뉴와 같다.
+    /// macOS 27 은 직접 띄운 창에는 메뉴바 항목을 강조해 주지 않는다.
+    private func makeDetailsMenu() -> NSMenu {
         let menu = NSMenu()
+        menu.delegate = self
         menu.addItem(item("Refresh Now", #selector(refreshNow), key: "r"))
+        let usage = NSMenuItem()
+        usage.view = details
+        menu.addItem(usage)
+        menu.addItem(.separator())
+        menu.addItem(showOverlayItem)
+        menu.addItem(item("Reset Overlay Position", #selector(resetOverlayPosition)))
+        menu.addItem(.separator())
         menu.addItem(item("Settings…", #selector(openSettings), key: ","))
         menu.addItem(.separator())
-        menu.addItem(item("Quit", #selector(quit), key: "q"))
-        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.height + 5), in: button)
+        menu.addItem(item("Quit Usage Overlay", #selector(quit), key: "q"))
+        return menu
+    }
+
+    /// 열 때마다 지금 내용에 맞춰 크기를 다시 잡는다. 메뉴는 열려 있는 동안 항목 크기를 따라 늘지 않는다.
+    func menuWillOpen(_ menu: NSMenu) {
+        details.frame.size = details.fittingSize
+        showOverlayItem.state = settings.overlayVisible ? .on : .off
     }
 
     /// 설정 창을 띄우는 동안 보이는 메뉴. 평소엔 메뉴바 앱이라 안 보이지만,
@@ -194,14 +185,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func refreshNow() { store.refresh() }
 
-    @objc private func openSettings() {
-        details.dismiss()
-        settingsWindow.show()
-    }
+    @objc private func openSettings() { settingsWindow.show() }
 
     @objc private func quit() { NSApp.terminate(nil) }
 
-    private func resetOverlayPosition() {
+    @objc private func toggleOverlay() { settings.overlayVisible.toggle() }
+
+    @objc private func resetOverlayPosition() {
         panel.resetPosition()
         if !settings.overlayVisible { settings.overlayVisible = true }
     }

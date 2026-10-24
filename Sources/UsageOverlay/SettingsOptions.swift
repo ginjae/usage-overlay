@@ -25,6 +25,14 @@ enum Provider: CaseIterable {
         self == .claude ? \.menuBarClaudeWindow : \.menuBarCodexWindow
     }
 
+    var menuBarClockWindow: ReferenceWritableKeyPath<Settings, ClockWindowChoice> {
+        self == .claude ? \.menuBarClaudeClockWindow : \.menuBarCodexClockWindow
+    }
+
+    var clockWindowChoices: [ClockWindowChoice] {
+        self == .claude ? ClockWindowChoice.allCases : ClockWindowChoice.allCases.filter { $0 != .fable }
+    }
+
     var detailsShown: ReferenceWritableKeyPath<Settings, Bool> {
         self == .claude ? \.detailsClaude : \.detailsCodex
     }
@@ -160,6 +168,28 @@ enum MenuBarReset: String, CaseIterable, PrefValue {
         case .off, .countdown: return nil
         case .logoClock: return .sweep
         case .ringClock: return .ring
+        }
+    }
+}
+
+/// 공급자마다 하나인 리셋 시계의 기준 창. 퍼센트로 보이지 않는 창도 고를 수 있다.
+enum ClockWindowChoice: String, CaseIterable, PrefValue {
+    case firstShown, tightest, fiveHour, weekly, fable
+
+    var title: String { window?.title ?? "First Shown Window" }
+
+    func pick(from gauges: [Gauge], shown: [Gauge]) -> Gauge? {
+        if let window { return window.pick(from: gauges).first }
+        return shown.first
+    }
+
+    private var window: WindowChoice? {
+        switch self {
+        case .firstShown: return nil
+        case .tightest: return .tightest
+        case .fiveHour: return .fiveHour
+        case .weekly: return .weekly
+        case .fable: return .fable
         }
     }
 }

@@ -1,14 +1,10 @@
 import SwiftUI
 
-/// 메뉴바를 누르면 뜨는 상세 창. 메뉴바에 다 못 담는 값을 창마다 펼쳐 보여 준다.
-/// 설정은 바닥의 톱니바퀴가 여는 설정 창에서 바꾼다. 오버레이 켜고 끄기와 위치 되돌리기만은 자주 쓰여 여기에도 둔다.
+/// 새로고침 메뉴 바로 아래에 갱신 시각과 메뉴바에 다 못 담는 값을 창마다 펼쳐 보여 준다.
+/// 오버레이 · 설정 · 종료는 그 아래에 보통 메뉴 항목으로 붙는다.
 struct DetailsView: View {
     @ObservedObject var store: UsageStore
     @ObservedObject var settings = Settings.shared
-    var refresh: () -> Void
-    var resetOverlayPosition: () -> Void
-    var openSettings: () -> Void
-    var quit: () -> Void
 
     private var providers: [Provider] {
         settings.providerOrder.providers.filter { settings[keyPath: $0.detailsShown] }
@@ -16,55 +12,26 @@ struct DetailsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            ForEach(providers, id: \.self) { provider in
-                ProviderDetails(provider: provider, usage: provider.usage(in: store.snapshot), now: store.now)
+            if settings.detailsUpdated {
+                Text(store.isRefreshing ? "Refreshing…"
+                     : Format.freshness(of: providers.compactMap { $0.usage(in: store.snapshot) }, from: store.now))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 Divider()
+            }
+            ForEach(Array(providers.enumerated()), id: \.element) { index, provider in
+                if index > 0 { Divider() }
+                ProviderDetails(provider: provider, usage: provider.usage(in: store.snapshot), now: store.now)
             }
             if providers.isEmpty {
                 Text("No providers shown. Turn one on in Settings → Details.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
-                Divider()
             }
-            overlayControls
-            Divider()
-            footer
         }
-        .padding(14)
-        .frame(width: settings.detailsWidth)
-    }
-
-    private var overlayControls: some View {
-        HStack {
-            Toggle("Overlay", isOn: $settings.overlayVisible)
-                .toggleStyle(.switch)
-                .controlSize(.small)
-            Spacer(minLength: 0)
-            Button("Reset Position", action: resetOverlayPosition)
-                .controlSize(.small)
-        }
-        .font(.callout)
-    }
-
-    private var footer: some View {
-        HStack(spacing: 12) {
-            if settings.detailsUpdated {
-                Text(Format.freshness(of: providers.compactMap { $0.usage(in: store.snapshot) }, from: store.now))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 0)
-            Button(action: refresh) {
-                Image(systemName: store.isRefreshing ? "hourglass" : "arrow.clockwise")
-            }
-            .disabled(store.isRefreshing)
-            .help(store.isRefreshing ? "Refreshing…" : "Refresh now")
-            Button(action: openSettings) { Image(systemName: "gearshape") }
-                .help("Settings…")
-            Button(action: quit) { Image(systemName: "power") }
-                .help("Quit Usage Overlay")
-        }
-        .buttonStyle(.borderless)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .frame(width: settings.detailsWidth, alignment: .leading)
     }
 }
 
