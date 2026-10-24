@@ -7,6 +7,9 @@ final class CommandRunnerTests: XCTestCase {
     private static let directory = FileManager.default.temporaryDirectory
         .appendingPathComponent("usage-overlay-command-tests-\(UUID().uuidString)")
     private static var executable: URL?
+    // Hosted macOS runners need time to launch the fixture and install its SIGTERM handler.
+    // A 150 ms timeout can terminate it before main(), leaving the cleanup path untested.
+    private let stubbornTimeout: TimeInterval = 2
 
     override class func tearDown() {
         try? FileManager.default.removeItem(at: directory)
@@ -59,7 +62,7 @@ final class CommandRunnerTests: XCTestCase {
 
     func testRepeatedTimeoutsReapStubbornProcesses() throws {
         for _ in 0..<3 {
-            XCTAssertNil(try run("stubborn", timeout: 0.15))
+            XCTAssertNil(try run("stubborn", timeout: stubbornTimeout))
         }
     }
 
@@ -76,7 +79,7 @@ final class CommandRunnerTests: XCTestCase {
         let payload = String(repeating: "a", count: 256 * 1024)
         XCTAssertEqual(try run("echo", stdin: [payload]), payload + "\n")
         // More than a pipe can hold, with a child that never reads it.
-        XCTAssertNil(try run("stubborn", stdin: [payload], timeout: 0.15))
+        XCTAssertNil(try run("stubborn", stdin: [payload], timeout: stubbornTimeout))
     }
 
     func testMissingExecutableReturnsNil() {
