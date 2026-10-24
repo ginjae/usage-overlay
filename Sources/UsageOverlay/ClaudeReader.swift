@@ -10,6 +10,7 @@ import Foundation
 ///
 ///     Current session: 46% used · resets Sep 2 at 1:09pm (Asia/Seoul)
 ///     Current week (all models): 5% used · resets Sep 3 at 4:59pm (Asia/Seoul)
+///     Current week (Fable): 0% used · resets Sep 3 at 4:59pm (Asia/Seoul)   ← Max 등 일부 요금제
 enum ClaudeReader {
     /// 요금제는 사용량과 달리 거의 안 바뀐다. 한 번만 물어보고 들고 있는다.
     private static var cachedPlan: String?
@@ -87,10 +88,8 @@ enum ClaudeReader {
         let name = name.lowercased()
         if name.contains("session") { return ("5-hour", 300) }
         if name.contains("week") {
-            // 요금제에 따라 "week (all models)" 외에 모델별 주간 창이 따로 나온다.
-            if name.contains("opus") { return ("Opus", 10080) }
-            if name.contains("sonnet") { return ("Sonnet", 10080) }
-            return ("Weekly", 10080)
+            // 요금제에 따라 "week (all models)" 외에 Fable 전용 주간 창이 따로 나온다.
+            return (name.contains("fable") ? "Fable" : "Weekly", 10080)
         }
         return (name.capitalized, nil)
     }
