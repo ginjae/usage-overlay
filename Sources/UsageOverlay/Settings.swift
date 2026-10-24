@@ -40,7 +40,7 @@ final class Settings: ObservableObject {
     @Pref("menuBar.separator", .menuBar) var menuBarSeparator = WindowSeparator.dot
     @Pref("menuBarIcon", .menuBar) var menuBarIcon = true
     /// 남은 시간을 붙일지, 붙인다면 글자로 셀지 로고에 시계로 그릴지. 예) `5h 39% · 2h 10m`
-    @Pref("menuBarReset", .menuBar) var menuBarReset = MenuBarReset.off
+    @Pref("menuBarReset", .menuBar) var menuBarReset = MenuBarReset.logoClock
     /// 카운트다운을 몇 단위까지 쓸지. 1 이면 `2h`, 2 면 `2h 10m`.
     @Pref("menuBar.countdownUnits", .menuBar) var menuBarCountdownUnits = 2
     /// 시계는 퍼센트에 띄운 창과 따로 고를 수 있다. 기본은 예전처럼 첫 번째로 보이는 창을 따른다.
