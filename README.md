@@ -32,6 +32,8 @@ Click the menu bar item for the details. **Refresh Now** sits at the top, follow
 
 <img src="docs/details.png" width="360" alt="Details menu with Refresh Now first, Updated just now and a divider below it, followed by Claude and Codex usage, weekday reset times, and app controls.">
 
+Codex plan labels use **Pro 100**, **Pro 200**, and **Pro 500** for the ChatGPT Pro subscriptions at **$100**, **$200**, and **$500 per month**. See the official [pricing](https://learn.chatgpt.com/docs/pricing) and [Pro tier names](https://learn.chatgpt.com/docs/dots#access) (checked November 4, 2026).
+
 Settings apply as you change them:
 
 | Pane | What you can change |

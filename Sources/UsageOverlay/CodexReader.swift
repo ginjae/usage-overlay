@@ -75,6 +75,12 @@ enum CodexReader {
 
     private static func plan(_ raw: String?) -> String? {
         guard let raw, !raw.isEmpty else { return nil }
-        return raw == "prolite" ? "Pro Lite" : raw.capitalized
+        // CLI의 내부 등급 코드는 ChatGPT의 공개 요금제 이름으로 표시한다.
+        switch raw {
+        case "prolite": return "Pro 100"
+        case "pro": return "Pro 200"
+        case "promax": return "Pro 500"
+        default: return raw.capitalized
+        }
     }
 }
