@@ -1,83 +1,118 @@
 # Usage Overlay
 
-A macOS menu bar app that keeps your **Claude** and **Codex** rate-limit usage on screen at all times.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/overlay-dark.png">
+  <img src="docs/overlay.png" width="300" alt="The floating overlay showing how much of each Claude and Codex rate-limit window is left and when it resets.">
+</picture>
 
-<img src="docs/overlay.png" width="290" alt="The overlay panel showing how much of each Claude and Codex rate-limit window is left.">
+## Overview
 
-By default, each row shows one rate-limit window: **how much of it is left**, and the time until it resets. For example, 39% means 39% is still available. You can switch to **Percent Used** separately for the menu bar, details, and overlay. Bars turn amber below 50% remaining and red below 20% remaining, whichever percentage you display. The thresholds and colors can be changed in **Settings → Colors**.
+Usage Overlay is a macOS menu bar app that keeps your **Claude** and **Codex** rate-limit usage in view. For each rate-limit window it shows how much is left and when the window resets, in three places:
 
-The menu bar defaults to **All Windows** for each provider, with window labels hidden and **Logo Clock** for reset time. Choose a specific window or **Tightest Window** (the one with the least headroom) in **Settings → Menu Bar**. Window labels are optional: with short labels, `5h 39%` means 39% of the 5-hour window is left, and `7d 62%` means 62% of the weekly window is left.
+- **Menu bar**: each provider's logo and what's left. The logo doubles as a clock for the time until reset.
+- **Details menu**: every window with a bar, its reset time, and your plan.
+- **Overlay**: an optional floating panel that stays above other windows.
 
-The **Menu Bar → Preview** shows your configuration on light and dark backgrounds:
+Bars turn amber below 50% left and red below 20% left.
 
-<img src="docs/menubar.png" width="129" alt="Settings preview showing Claude and Codex usage with logo clocks on light and dark backgrounds.">
+## Quick start
 
-The numbers come from the CLIs you already have. The default refresh interval is 5 minutes; change it under **Settings → General**. Polling pauses while the Mac or display sleeps, or your login session is inactive, and resumes when active. Usage checks query quota information without asking a model to generate a response.
+1. Install and sign in to the CLI for each provider you use. Check with `claude auth status` and `codex login status`.
+2. Download `Usage-Overlay-v*.zip` from the [latest release](https://github.com/ginjae/usage-overlay/releases/latest), unzip it, and move **Usage Overlay.app** to `/Applications`.
+3. Open the app. Releases are ad-hoc signed rather than notarized, so macOS may block the first launch. If it does, go to **System Settings → Privacy & Security** and choose **Open Anyway**.
+4. Your usage appears in the menu bar. Click it and choose **Show Overlay** to float the panel.
 
-If a provider is enabled only in the overlay, hiding the overlay pauses that provider's usage queries until the overlay is shown again.
+Requires macOS 14 or later, on Apple Silicon or Intel. Which windows you see depends on your account.
 
-## Install
+## How it works
 
-Download `Usage-Overlay-v*.zip` from the [latest release](https://github.com/ginjae/usage-overlay/releases/latest), unzip it, and move **Usage Overlay.app** to `/Applications`.
+### Where the numbers come from
 
-You need macOS 14 or later. Release downloads run natively on Apple Silicon and Intel Macs. Install and sign in to the CLI for each provider you use — check with `claude auth status` and `codex login status`. Only use one provider? Turn the other off in **Settings** under **Menu Bar**, **Details**, and **Overlay**, and its CLI will not be run. Available rate-limit windows depend on your account.
+The app runs the CLIs you're already signed in to and reads what they print. It finds them in their usual install locations, or at the paths you set in **Settings → General → Command-line tools**.
 
-Releases are ad-hoc signed rather than notarized, so macOS may block opening the app. After trying to open it, go to **System Settings → Privacy & Security → Security → Open Anyway** if macOS offers that option.
+```bash
+claude -p "/usage" --session-id <new UUID>   # Claude Code: usage
+claude auth status                           # Claude Code: plan name, once per launch
+codex app-server                             # Codex: usage and plan, over JSON-RPC
+```
 
-[Screenshot details](docs/README.md) record the captured build and configuration.
+`/usage` is built into Claude Code, so no prompt goes to a model. The app deletes the transcript that the one-off session leaves in `~/.claude/projects`.
 
-## Details and settings
+Codex has no usage subcommand, so the app starts the same app server the Codex TUI uses and writes these lines to its stdin:
 
-Click the menu bar item for the details. **Refresh Now** sits at the top, followed by the last updated time and a divider, then each enabled provider's usage and reset times. Reset times always use the weekday and local time. Hide the timestamp with **Settings → Details → Last updated**. Turn on **Pace** in the same pane to project whether your current usage rate will exhaust a window before it resets. Below the usage are **Show Overlay**, **Reset Overlay Position**, **Settings…** and **Quit Usage Overlay**.
+```json
+{"id":0,"method":"initialize","params":{"clientInfo":{"name":"usage-overlay","version":"1.0.0"}}}
+{"method":"initialized"}
+{"id":1,"method":"account/rateLimits/read"}
+```
 
-<img src="docs/details.png" width="360" alt="Details menu with Refresh Now first, Updated just now and a divider below it, followed by Claude and Codex usage, weekday reset times, and app controls.">
+It refreshes every 5 minutes (**Settings → General**) and pauses while the Mac or display sleeps. A provider's CLI runs only while that provider is shown in the menu bar, the details menu, or a visible overlay.
 
-Codex plan labels use **Pro 100**, **Pro 200**, and **Pro 500** for the ChatGPT Pro subscriptions at **$100**, **$200**, and **$500 per month**. See the official [pricing](https://learn.chatgpt.com/docs/pricing) and [Pro tier names](https://learn.chatgpt.com/docs/dots#access) (checked November 4, 2026).
+### Menu bar and details
 
-Settings is laid out like System Settings: search the sidebar to find a pane by any of its rows, and go back and forward between panes with ⌘[ and ⌘]. Settings apply as you change them:
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/menubar-dark.png">
+  <img src="docs/menubar.png" width="142" alt="The menu bar item on light and dark menu bars: Claude's logo clock with 62% and 43% left, and Codex's with 86% left.">
+</picture>
+
+By default the menu bar shows every window for each provider. In **Settings → Menu Bar** you can show one window or the **Tightest Window** (the one with the least left), add labels such as `5h 39%`, or switch to **Percent Used**.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/details-dark.png">
+  <img src="docs/details.png" width="356" alt="The details menu: Refresh Now, last updated time, Claude's 5-hour and Weekly windows and Codex's Weekly window with bars and reset times, then the app's commands.">
+</picture>
+
+Click the menu bar item for the details menu. It lists each window's time to reset and the weekday and time it resets. Turn on **Pace** in **Settings → Details** to see whether your current rate will use up a window before it resets. Codex plans **Pro 100**, **Pro 200**, and **Pro 500** are the [ChatGPT Pro tiers](https://learn.chatgpt.com/docs/pricing) at $100, $200, and $500 a month.
+
+### Overlay
+
+The overlay starts hidden and shows **5-hour** and **Weekly** for each provider. It floats above other windows on every Space, including full screen, and stays where you drag it. Set its opacity, click-through, columns, size, and background in **Settings → Overlay**. On macOS 26 and later, the background options include Liquid Glass.
+
+### Settings
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/settings-dark.png">
+  <img src="docs/settings.png" width="720" alt="The Settings window laid out like System Settings, showing the Menu Bar pane with its preview and provider options.">
+</picture>
+
+Settings is laid out like System Settings. Search the sidebar to find the pane for any setting, and press ⌘[ and ⌘] to go back and forward. Changes apply right away, and every pane except **Updates** has its own **Restore Defaults**.
 
 | Pane | What you can change |
 |---|---|
-| **General** | Launch at login, refresh interval, provider order, where the CLIs are |
-| **Updates** | Installed version, update status and release notes, automatic checks |
-| **Menu Bar** | Providers and windows, percentage display, reset time, appearance, spacing, the hover tooltip |
-| **Details** | Providers and windows, percent left or used, each line (plan, bar, time to reset, reset time, pace, last updated), width |
-| **Overlay** | Visibility, opacity, click-through, locked position, providers and windows, each column, width, text size, bar thickness, background, corners, border, Spaces, staying on top |
-| **Colors** | The three level colors and where each starts, and the provider logo colors |
+| **General** | Launch at login, refresh interval, provider order, CLI locations |
+| **Updates** | Installed version, release notes, automatic checks |
+| **Menu Bar** | Windows, percent left or used, reset time, appearance, tooltip |
+| **Details** | Windows, percent left or used, which lines to show, width |
+| **Overlay** | Visibility, opacity, click-through, position lock, windows and columns, size, background, Spaces |
+| **Colors** | Level colors and where each starts, provider logo colors |
 
-Every pane except **Updates** has **Restore Defaults** for that pane alone.
+In **Details** and **Overlay**, **Selected Windows** lets you pick each provider's windows one by one.
 
-In **Details** or **Overlay**, choose **Selected Windows** under a provider to turn individual windows on or off — for example, show **5-hour** and **Weekly** while hiding **Fable**. Each pane and provider keeps its own selection. Only windows available on your account are displayed.
+### Updates
 
-The overlay starts hidden; enable it with **Show Overlay** in the menu. Its default selection is **5-hour** and **Weekly** for each provider. When shown, it floats above other windows on every Space, including full screen. Drag it by its background; it remembers where you left it. Existing saved preferences are preserved when updating.
+Once a day the app checks GitHub for a new version and asks before installing it. It verifies the download against its SHA-256 checksum when one is published, checks the app identifier and version, then replaces itself and reopens. Your settings are kept. A red badge in the Settings sidebar marks a new version, and **Settings → Updates** shows what's new. The app has to be in a folder it can write to, such as `/Applications`.
 
-## Updates
+### Privacy
 
-The installed app checks for a new version once a day by default and asks before installing one — **Update**, **Later**, or **Skip This Version**. It compares the archive with a SHA-256 checksum when one is available, checks the app identifier and version, then replaces itself and reopens. When a new version is out, a red badge and **Update Available** appear at the top of the Settings sidebar. **Settings → Updates** shows what's new and installs it with **Update Now**; opening it also checks for a new version, unless automatic checks are off. Run a check yourself with **Check Now**, or turn off automatic checks, in the same pane. Self-updates require write access to the app's containing folder and cannot run from a read-only, translocated copy.
+The app's own network requests are GitHub release checks and update downloads. They carry no usage data or credentials. Usage is queried by the CLIs with their own sign-in; the app reads their output and never reads stored credentials. There is no telemetry. You can turn off update checks in **Settings → Updates**.
 
-## Privacy
+## Troubleshooting
 
-Usage Overlay's own network requests are GitHub release checks and update downloads. Those requests do not include your usage data or CLI credentials. Usage queries are performed by the signed-in CLIs using their existing credentials; the app reads their output rather than accessing stored credentials. It does not upload usage data or telemetry. Automatic update checks can be turned off in **Settings → Updates**.
-
-## If something looks wrong
-
-- **A row says the CLI wasn't found.** It is installed somewhere unusual. Point at it under **Settings → General → Command-line tools**; the line under each path shows which file is in use.
-- **An update won't install.** The app can only replace itself where it can write, and not while macOS runs it from a read-only copy. Move it to `/Applications` and open it again.
-- **The numbers look old.** The details menu and the overlay footer show their age. Refresh from **Refresh Now** in the menu or the overlay's refresh button.
-- **A selected window shows another window instead.** That window is not available in the current response, so the app falls back to the provider's tightest window.
-- **The overlay won't move.** Turn off **Click through** and **Lock position** under **Settings → Overlay**. Use **Reset Overlay Position** in the menu to move it back to the primary display's top-right corner.
+- **A provider says its CLI wasn't found.** Point to it in **Settings → General → Command-line tools**.
+- **The numbers look old.** The details menu and the overlay show when they were updated. Use **Refresh Now** or the overlay's refresh button.
+- **The overlay won't move.** Turn off **Click through** and **Lock position** in **Settings → Overlay**, or use **Reset Overlay Position** in the menu.
+- **An update won't install.** Move the app to `/Applications` and open it again.
 
 ## Build from source
 
-Requires macOS and Swift 6 or later, provided by Xcode or its Command Line Tools.
+Requires Swift 6 or later, from Xcode or its Command Line Tools. Build with Xcode 26 or later to get the Liquid Glass look on macOS 26 and later. With an older SDK the app keeps the previous look, and the script warns about it.
 
 ```bash
-xcode-select --install     # if the build tools are missing
-./scripts/bundle.sh        # → build/Usage Overlay.app
+./scripts/bundle.sh               # → build/Usage Overlay.app
+./scripts/bundle.sh --universal   # Apple Silicon and Intel
+swift test
 ```
 
-Run `./scripts/bundle.sh --universal` to build for both Apple Silicon and Intel. Open the resulting app from `build`, or copy it to `/Applications`.
+Set `APP_VERSION` and `BUILD_NUMBER` for the bundle's version (defaults: `0.1.0` and `1`). The tests run against a small local CLI fixture and never query your accounts.
 
-Set `APP_VERSION` and `BUILD_NUMBER` when you need specific bundle version metadata; the script defaults to `0.1.0` and `1`.
-
-Run `swift test` for regression checks covering CLI timeouts, process cleanup, output limits, and provider visibility. Tests compile a small local CLI fixture with `xcrun clang`; they do not query your Claude or Codex accounts.
+[About the screenshots](docs/README.md)
