@@ -34,17 +34,18 @@ Click the menu bar item for the details. **Refresh Now** sits at the top, follow
 
 Codex plan labels use **Pro 100**, **Pro 200**, and **Pro 500** for the ChatGPT Pro subscriptions at **$100**, **$200**, and **$500 per month**. See the official [pricing](https://learn.chatgpt.com/docs/pricing) and [Pro tier names](https://learn.chatgpt.com/docs/dots#access) (checked November 4, 2026).
 
-Settings apply as you change them:
+Settings is laid out like System Settings: search the sidebar to find a pane by any of its rows, and go back and forward between panes with ⌘[ and ⌘]. Settings apply as you change them:
 
 | Pane | What you can change |
 |---|---|
-| **General** | Launch at login, refresh interval, provider order, where the CLIs are, updates |
+| **General** | Launch at login, refresh interval, provider order, where the CLIs are |
+| **Updates** | Installed version, update status and release notes, automatic checks |
 | **Menu Bar** | Providers and windows, percentage display, reset time, appearance, spacing, the hover tooltip |
 | **Details** | Providers and windows, percent left or used, each line (plan, bar, time to reset, reset time, pace, last updated), width |
 | **Overlay** | Visibility, opacity, click-through, locked position, providers and windows, each column, width, text size, bar thickness, background, corners, border, Spaces, staying on top |
 | **Colors** | The three level colors and where each starts, and the provider logo colors |
 
-Each pane has **Restore Defaults** for that pane alone.
+Every pane except **Updates** has **Restore Defaults** for that pane alone.
 
 In **Details** or **Overlay**, choose **Selected Windows** under a provider to turn individual windows on or off — for example, show **5-hour** and **Weekly** while hiding **Fable**. Each pane and provider keeps its own selection. Only windows available on your account are displayed.
 
@@ -52,11 +53,11 @@ The overlay starts hidden; enable it with **Show Overlay** in the menu. Its defa
 
 ## Updates
 
-The installed app checks for a new version once a day by default and asks before installing one — **Update**, **Later**, or **Skip This Version**. It compares the archive with a SHA-256 checksum when one is available, checks the app identifier and version, then replaces itself and reopens. Run a check yourself, or turn off automatic checks, under **Settings → General**. Self-updates require write access to the app's containing folder and cannot run from a read-only, translocated copy.
+The installed app checks for a new version once a day by default and asks before installing one — **Update**, **Later**, or **Skip This Version**. It compares the archive with a SHA-256 checksum when one is available, checks the app identifier and version, then replaces itself and reopens. When a new version is out, a red badge and **Update Available** appear at the top of the Settings sidebar. **Settings → Updates** shows what's new and installs it with **Update Now**; opening it also checks for a new version, unless automatic checks are off. Run a check yourself with **Check Now**, or turn off automatic checks, in the same pane. Self-updates require write access to the app's containing folder and cannot run from a read-only, translocated copy.
 
 ## Privacy
 
-Usage Overlay's own network requests are GitHub release checks and update downloads. Those requests do not include your usage data or CLI credentials. Usage queries are performed by the signed-in CLIs using their existing credentials; the app reads their output rather than accessing stored credentials. It does not upload usage data or telemetry. Automatic update checks can be turned off in **Settings → General**.
+Usage Overlay's own network requests are GitHub release checks and update downloads. Those requests do not include your usage data or CLI credentials. Usage queries are performed by the signed-in CLIs using their existing credentials; the app reads their output rather than accessing stored credentials. It does not upload usage data or telemetry. Automatic update checks can be turned off in **Settings → Updates**.
 
 ## If something looks wrong
 

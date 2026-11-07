@@ -9,7 +9,7 @@ final class Settings: ObservableObject {
     static let shared = Settings()
 
     /// 설정 창의 한 쪽. 기본값 되돌리기를 이 단위로 한다.
-    enum Section { case general, menuBar, details, overlay, colors }
+    enum Section { case general, updates, menuBar, details, overlay, colors }
 
     let defaults = Prefs.defaults
 
@@ -24,7 +24,7 @@ final class Settings: ObservableObject {
     @Pref("path.claude", .general) var claudePath = ""
     @Pref("path.codex", .general) var codexPath = ""
     /// 하루 한 번 새 버전이 나왔는지 본다. 앱이 스스로 네트워크를 쓰는 유일한 자리라 끌 수 있게 둔다.
-    @Pref("autoUpdate", .general) var autoUpdate = true
+    @Pref("autoUpdate", .updates) var autoUpdate = true
 
     // MARK: - 메뉴바
 

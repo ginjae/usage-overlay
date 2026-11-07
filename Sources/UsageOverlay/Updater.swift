@@ -123,8 +123,30 @@ final class Updater: ObservableObject {
 
     /// 설정 창이 검사 중인지 보여 주려고 지켜본다.
     @Published private(set) var status: Status = .idle
+    /// 이번 실행에서 마지막으로 검사한 결과. 설정 창의 Updates 쪽이 알림창 대신 이걸 그린다.
+    /// 건너뛰기로 한 버전이어도 그대로 남긴다. 직접 열어 본 사람에게는 보여 준다.
+    @Published private(set) var lastOutcome: Outcome?
+    /// 마지막으로 물어본 시각. 앱을 다시 켜도 남는다.
+    @Published private(set) var lastChecked: Date? = Prefs.lastUpdateCheck
     /// 검사 결과를 넘기는 자리. 알림창을 띄우는 일은 AppDelegate가 한다.
     var onCheckFinished: ((Outcome, _ userInitiated: Bool) -> Void)?
+
+    /// 받을 수 있는 새 버전.
+    var available: Release? {
+        if case .found(let release) = lastOutcome { return release }
+        return nil
+    }
+
+    /// 건너뛰지 않은 새 버전. 설정 창 사이드바에 배지로 알린다.
+    var pending: Release? {
+        available.flatMap { $0.version.description == Prefs.skippedVersion ? nil : $0 }
+    }
+
+    /// "Skip This Version". 자동 검사가 다시 묻지 않고, 사이드바 배지도 내린다.
+    func skip(_ release: Release) {
+        objectWillChange.send()
+        Prefs.skippedVersion = release.version.description
+    }
 
     /// 실행 중인 버전. 번들이 아니면(=`swift run`) 알 수 없다.
     let currentVersion: AppVersion? =
@@ -193,6 +215,7 @@ final class Updater: ObservableObject {
     func check(userInitiated: Bool) {
         guard case .idle = status else { return }
         if let reason = unavailableReason {
+            lastOutcome = .failed(reason)
             onCheckFinished?(.failed(reason), userInitiated)
             return
         }
@@ -205,8 +228,11 @@ final class Updater: ObservableObject {
             let outcome = Self.outcome(data: data, response: response, error: error, current: current)
             DispatchQueue.main.async {
                 guard let self else { return }
+                let now = Date()
                 self.status = .idle
-                Prefs.lastUpdateCheck = Date()
+                self.lastOutcome = outcome
+                self.lastChecked = now
+                Prefs.lastUpdateCheck = now
                 self.scheduleCheck()
                 self.report(outcome, userInitiated: userInitiated)
             }

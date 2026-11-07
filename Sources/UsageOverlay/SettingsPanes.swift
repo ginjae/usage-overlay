@@ -7,7 +7,6 @@ import SwiftUI
 struct GeneralPane: View {
     @ObservedObject var settings = Settings.shared
     @ObservedObject var store: UsageStore
-    @ObservedObject var updater: Updater
     let actions: SettingsActions
     /// 로그인 항목은 설정 저장소가 아니라 시스템이 들고 있다. 창을 열 때 한 번 묻는다.
     @ViewState private var launchAtLogin = SMAppService.mainApp.status == .enabled
@@ -17,6 +16,8 @@ struct GeneralPane: View {
 
     var body: some View {
         Form {
+            PaneHeader(.general)
+
             Section("Startup") {
                 Toggle("Launch at login", isOn: Binding(get: { launchAtLogin }, set: setLaunchAtLogin))
                 if let loginError { Caption(loginError) }
@@ -38,22 +39,6 @@ struct GeneralPane: View {
                 CLIPathRow(name: "claude", path: $settings.claudePath, store: store, refresh: actions.refresh)
                 CLIPathRow(name: "codex", path: $settings.codexPath, store: store, refresh: actions.refresh)
                 Caption("Leave a path empty to look in the usual install locations.")
-            }
-
-            Section("Updates") {
-                LabeledContent("Version", value: updater.currentVersion.map { "\($0)" } ?? "Development build")
-                Toggle("Check for updates daily", isOn: $settings.autoUpdate)
-                HStack {
-                    Button("Check Now", action: actions.checkForUpdates)
-                        .disabled(updater.status != .idle)
-                    if updater.status != .idle {
-                        ProgressView().controlSize(.small)
-                        Text(updater.status == .checking ? "Checking…" : "Downloading…")
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Button("Release Notes", action: actions.openReleaseNotes)
-                }
             }
 
             RestoreDefaults(section: .general)
@@ -140,6 +125,195 @@ private struct CLIPathRow: View {
     }
 }
 
+// MARK: - Updates
+
+/// 시스템 설정의 소프트웨어 업데이트처럼 지금 상태를 맨 위 한 칸에 보여 준다.
+/// 직접 누른 검사의 결과도 알림창 대신 여기 뜬다.
+struct UpdatesPane: View {
+    @ObservedObject var settings = Settings.shared
+    @ObservedObject var updater: Updater
+    let actions: SettingsActions
+
+    var body: some View {
+        Form {
+            PaneHeader(.updates)
+
+            Section { status }
+
+            if let release = updater.available, updater.unavailableReason == nil {
+                let notes = ReleaseNotes(release.notes)
+                if !notes.blocks.isEmpty {
+                    Section("What's New in \(release.version.description)") {
+                        notes
+                        Link("View on GitHub", destination: release.page)
+                    }
+                }
+            }
+
+            Section {
+                LabeledContent("Installed",
+                               value: updater.currentVersion.map { "Usage Overlay \($0.description)" } ?? "Development build")
+                Toggle("Check for updates automatically", isOn: $settings.autoUpdate)
+                Caption("Once a day, Usage Overlay asks GitHub whether a new version is out, and asks you before installing it.")
+            } footer: {
+                Button("All Release Notes", action: actions.openReleaseNotes)
+                    .buttonStyle(.link)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 4)
+            }
+        }
+        .formStyle(.grouped)
+        .onAppear(perform: checkIfUnknown)
+    }
+
+    /// 이번 실행에서 아직 물어본 적이 없으면 쪽을 여는 김에 물어본다. 자동 검사를 껐으면 누를 때까지 기다린다.
+    private func checkIfUnknown() {
+        guard settings.autoUpdate, updater.lastOutcome == nil, updater.status == .idle,
+              updater.unavailableReason == nil else { return }
+        actions.checkForUpdates()
+    }
+
+    @ViewBuilder private var status: some View {
+        if let reason = updater.unavailableReason {
+            StatusRow(symbol: "info.circle.fill", tint: .secondary,
+                      title: "This copy can't update itself", detail: reason) {
+                Button("Open Releases Page", action: actions.openReleaseNotes)
+            }
+        } else if updater.status == .checking {
+            HStack {
+                Text("Checking for updates…")
+                Spacer()
+                ProgressView().controlSize(.small)
+            }
+        } else if updater.status == .downloading {
+            HStack {
+                Text("Downloading \(updater.available.map { "Usage Overlay \($0.version.description)" } ?? "the update")…")
+                Spacer()
+                ProgressView().controlSize(.small)
+            }
+        } else if let release = updater.available {
+            HStack(spacing: 12) {
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: 40, height: 40)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Usage Overlay \(release.version.description)")
+                        .font(.headline)
+                    Text("A new version is available."
+                         + (updater.currentVersion.map { " You have \($0.description)." } ?? ""))
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 12)
+                Button("Update Now") { actions.installUpdate(release) }
+                    .buttonStyle(.borderedProminent)
+            }
+            Caption("Usage Overlay quits and reopens itself to finish updating.")
+        } else {
+            switch updater.lastOutcome {
+            case .upToDate?:
+                StatusRow(symbol: "checkmark.circle.fill", tint: .green,
+                          title: "Usage Overlay is up to date", detail: lastChecked) { checkNow }
+            case .failed(let message)?:
+                StatusRow(symbol: "exclamationmark.triangle.fill", tint: .orange,
+                          title: "Couldn't check for updates", detail: message) {
+                    Button("Try Again", action: actions.checkForUpdates)
+                }
+            default:
+                StatusRow(title: "Check for updates",
+                          detail: lastChecked ?? "Automatic checks are off.") { checkNow }
+            }
+        }
+    }
+
+    private var checkNow: some View {
+        Button("Check Now", action: actions.checkForUpdates)
+    }
+
+    private var lastChecked: String? {
+        updater.lastChecked.map { "Last checked \($0.formatted(.dateTime.weekday(.abbreviated).hour().minute()))" }
+    }
+}
+
+/// 상태 한 줄. 왼쪽에 기호와 설명, 오른쪽에 할 일 단추.
+private struct StatusRow<Accessory: View>: View {
+    var symbol: String?
+    var tint: Color = .secondary
+    let title: String
+    var detail: String?
+    @ViewBuilder let accessory: () -> Accessory
+
+    var body: some View {
+        HStack(spacing: 10) {
+            if let symbol {
+                Image(systemName: symbol)
+                    .font(.title2)
+                    .foregroundStyle(tint)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                if let detail { Caption(detail) }
+            }
+            Spacer(minLength: 12)
+            accessory()
+        }
+    }
+}
+
+/// GitHub 릴리스 본문을 설정 창에 맞게 그린다.
+/// 제목 · 목록 · 문단만 가르고, 굵게 · 링크 같은 줄 안 꾸밈은 Markdown 을 그대로 읽는다.
+struct ReleaseNotes: View {
+    enum Block: Equatable {
+        case heading(String)
+        case bullet(String)
+        case paragraph(String)
+    }
+
+    let blocks: [Block]
+
+    init(_ markdown: String) { blocks = Self.blocks(of: markdown) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
+                switch block {
+                case .heading(let text):
+                    Text(Self.inline(text))
+                        .font(.headline)
+                        .padding(.top, 4)
+                case .bullet(let text):
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text("•")
+                        Text(Self.inline(text))
+                    }
+                case .paragraph(let text):
+                    Text(Self.inline(text))
+                }
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .textSelection(.enabled)
+    }
+
+    /// 맨 위 `# Usage Overlay v1.2.1` 같은 문서 제목은 바로 위 버전 줄과 겹치니 뺀다.
+    static func blocks(of markdown: String) -> [Block] {
+        markdown.components(separatedBy: .newlines).compactMap { raw in
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            if line.isEmpty || line.hasPrefix("# ") { return nil }
+            if line.hasPrefix("#") {
+                return .heading(line.drop(while: { $0 == "#" }).trimmingCharacters(in: .whitespaces))
+            }
+            if line.hasPrefix("- ") || line.hasPrefix("* ") { return .bullet(String(line.dropFirst(2))) }
+            return .paragraph(line)
+        }
+    }
+
+    private static func inline(_ text: String) -> AttributedString {
+        let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+        return (try? AttributedString(markdown: text, options: options)) ?? AttributedString(text)
+    }
+}
+
 // MARK: - Menu Bar
 
 struct MenuBarPane: View {
@@ -148,6 +322,8 @@ struct MenuBarPane: View {
 
     var body: some View {
         Form {
+            PaneHeader(.menuBar)
+
             Section("Preview") {
                 MenuBarPreview(store: store)
             }
@@ -273,6 +449,8 @@ struct DetailsPane: View {
 
     var body: some View {
         Form {
+            PaneHeader(.details)
+
             Section("Preview") {
                 HStack {
                     Spacer()
@@ -322,6 +500,8 @@ struct OverlayPane: View {
 
     var body: some View {
         Form {
+            PaneHeader(.overlay)
+
             Section("Visibility") {
                 Toggle("Show overlay", isOn: $settings.overlayVisible)
                 SliderRow(title: "Opacity", value: $settings.overlayOpacity,
@@ -387,6 +567,8 @@ struct ColorsPane: View {
 
     var body: some View {
         Form {
+            PaneHeader(.colors)
+
             Section("Levels") {
                 // 세 단계가 실제로 어떻게 보이는지. 각 단계 한가운데 값으로 막대를 채운다.
                 HStack(spacing: 12) {

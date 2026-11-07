@@ -16,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         store: store, updater: updater,
         actions: SettingsActions(refresh: { [weak self] in self?.store.refresh() },
                                  checkForUpdates: { [weak self] in self?.checkForUpdates() },
+                                 installUpdate: { [weak self] release in self?.install(release) },
                                  openReleaseNotes: { [weak self] in self?.openReleasesPage() },
                                  resetOverlayPosition: { [weak self] in self?.resetOverlayPosition() }))
     /// 내용이 달라졌을 때만 메뉴바 이미지와 툴팁을 교체한다.
@@ -202,27 +203,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func openReleasesPage() { NSWorkspace.shared.open(Updater.releasesPage) }
 
-    /// 자동 검사는 새 버전을 찾았을 때만 말을 건다. 직접 눌렀을 때는 결과가 무엇이든 답한다.
+    /// 자동 검사는 새 버전을 찾았을 때만 말을 건다.
+    /// 설정 창에서 부른 검사는 결과가 무엇이든 Updates 쪽에 바로 뜨므로 알림창을 따로 띄우지 않는다.
     private func checkFinished(_ outcome: Updater.Outcome, userInitiated: Bool) {
-        switch outcome {
-        case .found(let release):
-            offerUpdate(release)
-        case .upToDate:
-            guard userInitiated else { return }
-            let alert = NSAlert()
-            alert.messageText = "You're up to date."
-            alert.informativeText = updater.currentVersion.map { "Usage Overlay \($0) is the latest version." }
-                ?? "Nothing newer has been released."
-            run(alert)
-        case .failed(let message):
-            guard userInitiated else { return }
-            let alert = NSAlert()
-            alert.messageText = "Couldn't check for updates."
-            alert.informativeText = message
-            alert.addButton(withTitle: "Open Releases Page")
-            alert.addButton(withTitle: "OK")
-            if run(alert) == .alertFirstButtonReturn { openReleasesPage() }
-        }
+        guard !userInitiated, case .found(let release) = outcome else { return }
+        offerUpdate(release)
     }
 
     private func offerUpdate(_ release: Release) {
@@ -237,20 +222,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         alert.addButton(withTitle: "Skip This Version")
         switch run(alert) {
         case .alertFirstButtonReturn:
-            // 성공하면 앱이 그대로 종료되고 새 번들로 다시 뜬다. 여기 돌아오는 건 실패했을 때뿐이다.
-            updater.install(release) { [weak self] message in
-                guard let self else { return }
-                let failure = NSAlert()
-                failure.messageText = "Couldn't install the update."
-                failure.informativeText = message
-                failure.addButton(withTitle: "Open Releases Page")
-                failure.addButton(withTitle: "OK")
-                if self.run(failure) == .alertFirstButtonReturn { NSWorkspace.shared.open(release.page) }
-            }
+            install(release)
         case .alertThirdButtonReturn:
-            Prefs.skippedVersion = release.version.description
+            updater.skip(release)
         default:
             break
+        }
+    }
+
+    private func install(_ release: Release) {
+        // 성공하면 앱이 그대로 종료되고 새 번들로 다시 뜬다. 여기 돌아오는 건 실패했을 때뿐이다.
+        updater.install(release) { [weak self] message in
+            guard let self else { return }
+            let failure = NSAlert()
+            failure.messageText = "Couldn't install the update."
+            failure.informativeText = message
+            failure.addButton(withTitle: "Open Releases Page")
+            failure.addButton(withTitle: "OK")
+            if self.run(failure) == .alertFirstButtonReturn { NSWorkspace.shared.open(release.page) }
         }
     }
 
