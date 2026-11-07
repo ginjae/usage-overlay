@@ -17,4 +17,6 @@ Captured on November 8, 2026 (Asia/Seoul) from **Usage Overlay 1.3.0, local buil
 | [details.png](details.png), [details-dark.png](details-dark.png) | Details menu with each window's bar and reset times, then the app's commands | 712 × 974 |
 | [settings.png](settings.png), [settings-dark.png](settings-dark.png) | Settings window on the Menu Bar pane | 1744 × 1460 |
 
+[icon.png](icon.png) is the app icon, `Resources/AppIcon.png` scaled to 256 × 256.
+
 The main README shows these at half their pixel size for Retina sharpness, except the Settings window, which is shown smaller. Capture the app again after changing the interface, and update this page with the images.

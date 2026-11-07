@@ -1,3 +1,5 @@
+<img src="docs/icon.png" width="128" alt="Usage Overlay app icon">
+
 # Usage Overlay
 
 <picture>
