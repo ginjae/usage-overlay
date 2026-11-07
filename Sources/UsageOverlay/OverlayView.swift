@@ -26,7 +26,7 @@ struct OverlayView: View {
         .padding(.horizontal, 12 * scale)
         .padding(.vertical, 11 * scale)
         .frame(width: settings.overlayWidth, alignment: .leading)
-        .background(settings.overlayBackground.style, in: shape)
+        .modifier(Backdrop(background: settings.overlayBackground, shape: shape))
         .overlay {
             if settings.overlayBorder {
                 shape.strokeBorder(Color.white.opacity(0.13), lineWidth: 1)
@@ -88,6 +88,24 @@ private struct WindowDrag: ViewModifier {
         } else {
             content
         }
+    }
+}
+
+/// 고른 바탕을 패널 모양대로 깐다.
+private struct Backdrop: ViewModifier {
+    let background: OverlayBackground
+    let shape: RoundedRectangle
+
+    @ViewBuilder func body(content: Content) -> some View {
+        #if compiler(>=6.2)
+        if #available(macOS 26, *), background == .liquidGlass {
+            content.glassEffect(.regular, in: shape)
+        } else {
+            content.background(background.style, in: shape)
+        }
+        #else
+        content.background(background.style, in: shape)
+        #endif
     }
 }
 

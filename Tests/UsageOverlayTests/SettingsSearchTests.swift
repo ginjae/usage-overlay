@@ -16,6 +16,7 @@ final class SettingsSearchTests: XCTestCase {
         XCTAssertEqual(panes(matching: "launch at login"), [.general])
         XCTAssertEqual(panes(matching: "release notes"), [.updates])
         XCTAssertEqual(panes(matching: "PACE"), [.details])
+        XCTAssertEqual(panes(matching: "liquid glass"), [.overlay])
     }
 
     func testEveryWordMustMatchTheSamePane() {

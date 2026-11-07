@@ -102,7 +102,7 @@ final class Settings: ObservableObject {
     /// 글자와 여백을 함께 키운다. 막대 굵기는 따로 고른다.
     @Pref("overlay.scale", .overlay) var overlayScale = 1.0
     @Pref("overlay.barHeight", .overlay) var overlayBarHeight = 5.0
-    @Pref("overlay.background", .overlay) var overlayBackground = OverlayBackground.ultraThin
+    @Pref("overlay.background", .overlay) var overlayBackground = OverlayBackground.regular
     @Pref("overlay.cornerRadius", .overlay) var overlayCornerRadius = 13.0
     @Pref("overlay.border", .overlay) var overlayBorder = true
     @Pref("overlay.allSpaces", .overlay) var overlayAllSpaces = true

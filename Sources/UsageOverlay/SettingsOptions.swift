@@ -342,10 +342,16 @@ enum FontWeight: String, CaseIterable, PrefValue {
 }
 
 enum OverlayBackground: String, CaseIterable, PrefValue {
-    case ultraThin, thin, regular, thick, solid
+    case liquidGlass, ultraThin, thin, regular, thick, solid
+
+    /// 이 Mac 에서 고를 수 있는 바탕. Liquid Glass 는 macOS 26 이상, 26 SDK 로 빌드한 앱에서만 그려진다.
+    static var choices: [OverlayBackground] {
+        drawsLiquidGlass ? allCases : allCases.filter { $0 != .liquidGlass }
+    }
 
     var title: String {
         switch self {
+        case .liquidGlass: return "Liquid Glass"
         case .ultraThin: return "Clear Glass"
         case .thin: return "Light Glass"
         case .regular: return "Glass"
@@ -354,9 +360,10 @@ enum OverlayBackground: String, CaseIterable, PrefValue {
         }
     }
 
+    /// 머티리얼로 칠하는 바탕. Liquid Glass 를 그릴 수 없는 Mac 에서는 가장 맑은 머티리얼로 대신한다.
     var style: AnyShapeStyle {
         switch self {
-        case .ultraThin: return AnyShapeStyle(.ultraThinMaterial)
+        case .liquidGlass, .ultraThin: return AnyShapeStyle(.ultraThinMaterial)
         case .thin: return AnyShapeStyle(.thinMaterial)
         case .regular: return AnyShapeStyle(.regularMaterial)
         case .thick: return AnyShapeStyle(.thickMaterial)

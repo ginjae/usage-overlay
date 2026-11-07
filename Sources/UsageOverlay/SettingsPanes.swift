@@ -544,7 +544,7 @@ struct OverlayPane: View {
 
             Section("Background") {
                 ChoiceRow(title: "Material", selection: $settings.overlayBackground,
-                          choices: OverlayBackground.allCases, label: \.title)
+                          choices: OverlayBackground.choices, label: \.title)
                 SliderRow(title: "Corner radius", value: $settings.overlayCornerRadius, range: 0...24, step: 1)
                 Toggle("Border", isOn: $settings.overlayBorder)
             }

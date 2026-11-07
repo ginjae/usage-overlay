@@ -6,6 +6,14 @@ import SwiftUI
 /// 다른 이름을 거치면 예전처럼 속성 래퍼로 쓰이고, Xcode 에서도 그대로 빌드된다.
 typealias ViewState<Value> = SwiftUI.State<Value>
 
+/// 앱이 Liquid Glass 로 그려지는지. macOS 26 이상에서, 26 SDK 이상으로 빌드했을 때만 그렇다.
+let drawsLiquidGlass: Bool = {
+    #if compiler(>=6.2)
+    if #available(macOS 26, *) { return true }
+    #endif
+    return false
+}()
+
 /// 설정 창. 열려 있는 동안에는 Dock 과 ⌘-Tab 에 나타나 다른 앱처럼 오갈 수 있고, 닫으면 메뉴바로만 돌아간다.
 final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let navigation = SettingsNavigation()
@@ -20,10 +28,13 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         window.title = "Usage Overlay Settings"
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
         window.toolbarStyle = .unified
-        // 도구 막대 띠를 따로 칠하지 않고 사이드바와 본문 배경을 맨 위까지 잇는다.
-        window.titlebarAppearsTransparent = true
-        // 시스템 설정처럼 쪽 이름은 도구 막대 대신 각 쪽 맨 위 머리에 크게 쓴다. 창 메뉴에는 그대로 남는다.
-        window.titleVisibility = .hidden
+        // 시스템 설정처럼 쪽 이름은 각 쪽 맨 위 머리에 크게 쓴다.
+        // Liquid Glass 에서는 머리가 도구 막대 밑으로 올라가면 막대에도 띄우므로 SettingsView 가 제목을 다룬다.
+        if !drawsLiquidGlass {
+            // 도구 막대 띠를 따로 칠하지 않고 사이드바와 본문 배경을 맨 위까지 잇는다.
+            window.titlebarAppearsTransparent = true
+            window.titleVisibility = .hidden
+        }
         window.isReleasedWhenClosed = false
         window.setContentSize(NSSize(width: 760, height: 680))
         window.center()
@@ -164,7 +175,7 @@ struct SettingsView: View {
             case .details:
                 return "menu preview providers windows selected percent left used plan bar time to reset reset time pace last updated width"
             case .overlay:
-                return "floating panel visibility show overlay opacity click through lock position reset position providers windows selected provider name plan window name bar percent time to reset last updated refresh button width text size bar thickness background material corner radius border every space keep above other windows"
+                return "floating panel visibility show overlay opacity click through lock position reset position providers windows selected provider name plan window name bar percent time to reset last updated refresh button width text size bar thickness background material liquid glass corner radius border every space keep above other windows"
             case .colors:
                 return "levels plenty left running low almost out level colors provider logos text color"
             }
@@ -198,6 +209,7 @@ struct SettingsView: View {
                 .toolbar {
                     ToolbarItem(placement: .navigation) { HistoryButtons(navigation: navigation) }
                 }
+                .modifier(ScrollEdgeToolbar(title: navigation.pane.title))
         }
         .searchable(text: $query, placement: .sidebar, prompt: "Search")
         .frame(minWidth: 700, minHeight: 480)
@@ -377,6 +389,7 @@ private struct HistoryButtons: View {
 /// 쪽 맨 위의 큰 머리. 아이콘 · 이름 · 무엇을 하는 쪽인지 한두 줄.
 struct PaneHeader: View {
     let pane: SettingsView.Pane
+    @Environment(\.reportPaneTitleTop) private var reportTitleTop
 
     init(_ pane: SettingsView.Pane) { self.pane = pane }
 
@@ -387,6 +400,7 @@ struct PaneHeader: View {
                     .padding(.bottom, 4)
                 Text(pane.title)
                     .font(.title.bold())
+                    .onGeometryChange(for: CGFloat.self) { $0.frame(in: .scrollView).minY } action: { reportTitleTop($0) }
                 Text(pane.summary)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -395,6 +409,55 @@ struct PaneHeader: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 10)
         }
+    }
+}
+
+/// 쪽 머리의 큰 제목 윗변이 도구 막대 아래 끝에서 얼마나 떨어져 있는지 알린다. 막대에 가려지기 시작하면 음수다.
+/// 스크롤 뷰 좌표는 막대 아래 끝이 0 이다. 도구 막대가 쪽 이름을 띄울 때를 정한다.
+private struct PaneTitleTopKey: EnvironmentKey {
+    static let defaultValue: (CGFloat) -> Void = { _ in }
+}
+
+extension EnvironmentValues {
+    var reportPaneTitleTop: (CGFloat) -> Void {
+        get { self[PaneTitleTopKey.self] }
+        set { self[PaneTitleTopKey.self] = newValue }
+    }
+}
+
+/// 시스템 설정처럼, 맨 위에서는 도구 막대가 내용과 이어져 보이다가
+/// 내용이 막대 밑으로 들어가면 경계선을 긋고, 큰 제목이 막대에 닿으면 막대에 쪽 이름을 띄운다.
+/// Liquid Glass 에서만 그렇게 하고, 그 전 macOS 에서는 늘 막대를 비워 둔다.
+private struct ScrollEdgeToolbar: ViewModifier {
+    let title: String
+    /// 맨 위에서 조금이라도 내려왔는지.
+    @ViewState private var scrolled = false
+    @ViewState private var titleTop = CGFloat.infinity
+
+    func body(content: Content) -> some View {
+        #if compiler(>=6.2)
+        if #available(macOS 26, *) {
+            content
+                // .hard 는 맨 위에서도 경계선을 그어서, 내려왔을 때만 켠다. 기본 효과는 아무것도 긋지 않는다.
+                .scrollEdgeEffectStyle(scrolled ? .hard : nil, for: .top)
+                .onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y + $0.contentInsets.top > 0.5 } action: { _, now in
+                    scrolled = now
+                }
+                .environment(\.reportPaneTitleTop) { titleTop = $0 }
+                .navigationTitle(title)
+                // 시스템 설정처럼 큰 제목 윗변이 막대 아래 끝에 닿으면.
+                .toolbar(removing: titleTop <= 4 ? nil : .title)
+                // 다른 쪽으로 가면 그 쪽은 맨 위에서 시작한다.
+                .onChange(of: title) {
+                    scrolled = false
+                    titleTop = .infinity
+                }
+        } else {
+            content
+        }
+        #else
+        content
+        #endif
     }
 }
 
