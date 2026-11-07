@@ -81,6 +81,12 @@ ERROR
   exit 1
 fi
 
+SDK_PATH="$(xcrun --sdk macosx --show-sdk-path 2>/dev/null)" || die "The macOS SDK was not found. Install Xcode or its Command Line Tools with: xcode-select --install"
+# macOS 26 부터는 바이너리에 찍힌 SDK 버전이 26 이상인 앱만 Liquid Glass 모양으로 그린다.
+# SwiftPM 기본 빌드 시스템은 링크할 때 SDK 를 --sysroot 로만 넘겨서, clang 이 SDK 버전을 못 읽고
+# 최소 지원 버전(14.0)을 대신 찍는다. 링커에도 SDK 를 -isysroot 로 알려 줘 실제 SDK 버전이 찍히게 한다.
+SDK_FLAGS=(-Xswiftc -Xclang-linker -Xswiftc -isysroot -Xswiftc -Xclang-linker -Xswiftc "$SDK_PATH")
+
 [[ "$APP_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "APP_VERSION must look like 1.2.3 (got: $APP_VERSION)."
 [[ "$BUILD_NUMBER" =~ ^[0-9]+$ ]] || die "BUILD_NUMBER must be numeric (got: $BUILD_NUMBER)."
 
@@ -93,10 +99,10 @@ if ((UNIVERSAL)); then
   ARM_SCRATCH=".build/universal/arm64"
   INTEL_SCRATCH=".build/universal/x86_64"
 
-  "$SWIFT" build -c release --triple arm64-apple-macosx14.0 --scratch-path "$ARM_SCRATCH"
+  "$SWIFT" build -c release --triple arm64-apple-macosx14.0 --scratch-path "$ARM_SCRATCH" "${SDK_FLAGS[@]}"
   ARM_BIN_DIR="$("$SWIFT" build -c release --triple arm64-apple-macosx14.0 --scratch-path "$ARM_SCRATCH" --show-bin-path)"
 
-  "$SWIFT" build -c release --triple x86_64-apple-macosx14.0 --scratch-path "$INTEL_SCRATCH"
+  "$SWIFT" build -c release --triple x86_64-apple-macosx14.0 --scratch-path "$INTEL_SCRATCH" "${SDK_FLAGS[@]}"
   INTEL_BIN_DIR="$("$SWIFT" build -c release --triple x86_64-apple-macosx14.0 --scratch-path "$INTEL_SCRATCH" --show-bin-path)"
 
   rm -rf "$APP"
@@ -106,7 +112,7 @@ if ((UNIVERSAL)); then
     "$INTEL_BIN_DIR/UsageOverlay" \
     -output "$EXECUTABLE"
 else
-  "$SWIFT" build -c release
+  "$SWIFT" build -c release "${SDK_FLAGS[@]}"
   BIN_DIR="$("$SWIFT" build -c release --show-bin-path)"
 
   rm -rf "$APP"
@@ -165,8 +171,17 @@ fi
 "$CODESIGN" --force --sign - "$APP" >/dev/null
 "$CODESIGN" --verify --deep --strict "$APP"
 
+# 링크된 SDK 가 26 보다 낮으면 macOS 26 이상에서도 Liquid Glass 없이 예전 모양으로 뜬다.
+# 릴리스가 그렇게 나가지 않도록 CI 에서는 멈추고, 직접 빌드할 때는 알리기만 한다.
+LINKED_SDK="$(otool -l "$EXECUTABLE" | awk '$1 == "sdk" && !found { print $2; found = 1 }')"
+if [[ ! "$LINKED_SDK" =~ ^[0-9]+ ]] || ((${LINKED_SDK%%.*} < 26)); then
+  message="the app was linked against the macOS ${LINKED_SDK:-unknown} SDK, so macOS 26 and later show it without Liquid Glass. Build with Xcode 26 or newer to get it."
+  [[ -n "${CI:-}" ]] && die "$message"
+  printf 'warning: %s\n' "$message" >&2
+fi
+
 if ((UNIVERSAL)); then
-  echo "Universal 앱 빌드 완료 → $PWD/$APP"
+  echo "Universal 앱 빌드 완료 (macOS $LINKED_SDK SDK) → $PWD/$APP"
 else
-  echo "$(uname -m) 앱 빌드 완료 → $PWD/$APP"
+  echo "$(uname -m) 앱 빌드 완료 (macOS $LINKED_SDK SDK) → $PWD/$APP"
 fi
