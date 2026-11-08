@@ -1,0 +1,35 @@
+name: Release notes
+
+# docs/releases/<tag>.md is the source of every release's notes.
+# When those files change on main, update the matching GitHub releases.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/releases/**"
+      - ".github/workflows/release-notes.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Update release titles and notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for file in docs/releases/v*.md; do
+            tag="$(basename "$file" .md)"
+            # A tag that isn't released yet gets its notes from the Release workflow.
+            if gh release view "$tag" >/dev/null 2>&1; then
+              gh release edit "$tag" --title "$tag" --notes-file "$file"
+              echo "Updated $tag"
+            fi
+          done

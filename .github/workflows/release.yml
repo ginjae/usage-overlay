@@ -40,4 +40,5 @@ jobs:
             "build/Usage-Overlay-${GITHUB_REF_NAME}.zip" \
             "build/Usage-Overlay-${GITHUB_REF_NAME}.zip.sha256" \
             --verify-tag \
+            --title "$GITHUB_REF_NAME" \
             --notes-file "docs/releases/${GITHUB_REF_NAME}.md"
