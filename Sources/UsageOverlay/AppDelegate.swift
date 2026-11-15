@@ -10,7 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let settings = Settings.shared
     private var cancellables = Set<AnyCancellable>()
     /// 메뉴 윗부분에 그리는 사용량.
-    private lazy var details = NSHostingView(rootView: DetailsView(store: store))
+    private lazy var details = DetailsMenuItem(store: store)
     private lazy var showOverlayItem = item("Show Overlay", #selector(toggleOverlay))
     private lazy var settingsWindow = SettingsWindowController(
         store: store, updater: updater,
@@ -123,9 +123,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let menu = NSMenu()
         menu.delegate = self
         menu.addItem(item("Refresh Now", #selector(refreshNow), key: "r"))
-        let usage = NSMenuItem()
-        usage.view = details
-        menu.addItem(usage)
+        menu.addItem(details)
         menu.addItem(.separator())
         menu.addItem(showOverlayItem)
         menu.addItem(item("Reset Overlay Position", #selector(resetOverlayPosition)))
@@ -136,9 +134,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return menu
     }
 
-    /// 열 때마다 지금 내용에 맞춰 크기를 다시 잡는다. 메뉴는 열려 있는 동안 항목 크기를 따라 늘지 않는다.
+    /// 첫 레이아웃이나 새로고침 직후 바로 열어도 현재 내용 크기로 시작한다.
     func menuWillOpen(_ menu: NSMenu) {
-        details.frame.size = details.fittingSize
+        details.sizeToFit()
         showOverlayItem.state = settings.overlayVisible ? .on : .off
     }
 
