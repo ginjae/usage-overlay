@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 사용량 수치와 섞지 않고, 공개 API의 상태·예고·예측을 출처와 함께 보여 준다.
+/// 상태·예고·예측을 짧은 행으로 보여 주고, 원문은 링크와 툴팁에 둔다.
 struct CodexResetsDetails: View {
     @ObservedObject var feed: CodexResetsStore
     let now: Date
@@ -8,56 +8,74 @@ struct CodexResetsDetails: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Codex Resets").font(.subheadline.weight(.semibold))
+                Link("Codex Resets ↗", destination: CodexResetsStore.website)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
                 Spacer(minLength: 4)
-                Text("Experimental").font(.caption2).foregroundStyle(.secondary)
+                if feed.isRefreshing {
+                    ProgressView().controlSize(.mini)
+                        .accessibilityLabel("Checking reset status")
+                }
             }
             if let status = feed.status {
                 if let reset = status.latestReset {
-                    entry(title: "Latest: \(reset.title)",
+                    summary("Latest", value: reset.title,
                           detail: date(reset.announcedAt), text: reset.text, source: reset.source)
-                } else {
-                    caption("No recorded reset.")
                 }
                 if let scheduled = status.scheduledReset {
-                    Divider()
-                    entry(title: scheduled.title,
-                          detail: scheduled.scheduledFor.map { "Scheduled for \(date($0))" }
-                            ?? "Time not specified",
+                    summary("Scheduled", value: scheduled.resetType == "banked" ? "Banked reset" : "Usage reset",
+                          detail: scheduled.scheduledFor.map(date) ?? "Time TBD",
                           text: scheduled.text, source: scheduled.source)
                 }
                 if let watch = status.activeWatch {
-                    Divider()
-                    let chance = watch.resetChancePercent.map { " · \($0)%" } ?? ""
-                    entry(title: "AI forecast: \(watch.level.capitalized)\(chance)",
-                          detail: watch.forecastWindow, text: watch.text, source: watch.source)
-                    caption("\(watch.expiresAt <= now ? "Expired" : "Expires") \(date(watch.expiresAt))")
+                    let expired = watch.expiresAt <= now
+                    summary("AI forecast",
+                            value: expired ? "Expired" : watch.resetChancePercent.map { "\($0)% chance" } ?? watch.level.capitalized,
+                            detail: expired ? date(watch.expiresAt) : watch.forecastWindow,
+                            text: watch.text, source: watch.source)
                 }
                 if status.scheduledReset == nil, status.activeWatch == nil {
-                    caption("No scheduled reset or active forecast.")
+                    caption("No upcoming reset")
                 }
-                if feed.isRefreshing { caption("Checking…") }
             } else {
-                caption(feed.error ?? (feed.isRefreshing ? "Checking…" : "Not checked yet."))
+                caption(feed.error == nil ? (feed.isRefreshing ? "Checking…" : "Not checked yet") : "Status unavailable")
+                    .help(feed.error ?? "")
             }
-            Link("Data from Codex Resets", destination: CodexResetsStore.website)
-                .font(.caption2)
         }
     }
 
-    private func entry(title: String, detail: String, text: String, source: CodexResetStatus.Source) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(title).font(.caption.weight(.semibold))
-            caption(detail)
-            Text(text)
+    private func summary(_ label: String, value: String, detail: String,
+                         text: String, source: CodexResetStatus.Source) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Text(label)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-                .lineLimit(3)
-                .help(text)
+                .frame(width: 62, alignment: .leading)
+                .padding(.top, 2)
             if let link = source.link {
-                Link("Source post ↗", destination: link).font(.caption2)
+                Link(destination: link) { valueLabel(value, detail: detail, linked: true) }
+                    .buttonStyle(.plain)
+            } else {
+                valueLabel(value, detail: detail, linked: false)
             }
         }
+        .help(text)
+    }
+
+    private func valueLabel(_ value: String, detail: String, linked: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 4) {
+                Text(value).font(.callout.weight(.medium))
+                if linked {
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 8, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .foregroundStyle(.primary)
+            caption(detail).lineLimit(2)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func caption(_ text: String) -> some View {
@@ -65,6 +83,7 @@ struct CodexResetsDetails: View {
     }
 
     private func date(_ date: Date) -> String {
-        date.formatted(date: .abbreviated, time: .shortened)
+        date.formatted(.dateTime.month(.abbreviated).day()) + " · "
+            + date.formatted(.dateTime.hour().minute())
     }
 }
