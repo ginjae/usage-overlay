@@ -79,8 +79,8 @@ final class Settings: ObservableObject {
     @Pref("details.pace", .details) var detailsPace = false
     @Pref("details.updated", .details) var detailsUpdated = true
     @Pref("details.width", .details) var detailsWidth = 300.0
-    /// 공개 reset 상태·예고·예측. 실험 기능이라 사용자가 켜기 전에는 요청하지 않는다.
-    @Pref("details.codexResets", .details) var detailsCodexResets = false
+    /// 공개 reset 상태·예고·예측. 기본으로 켜고, 사용자가 끄면 요청하지 않는다.
+    @Pref("details.codexResets", .details) var detailsCodexResets = true
 
     // MARK: - 오버레이
 

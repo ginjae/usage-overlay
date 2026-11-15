@@ -90,7 +90,7 @@ Settings is laid out like System Settings. Search the sidebar to find the pane f
 
 In **Details** and **Overlay**, **Selected Windows** lets you pick each provider's windows one by one.
 
-In **Settings → Details → Experimental**, turn on **Codex reset status** to show the latest reset, scheduled announcements, and AI forecasts from [Codex Resets](https://codex-resets.com). It reads the site's [public status API](https://codex-resets.com/api/docs) with each usage refresh and **Refresh Now**. Forecasts come from this community service and are not confirmed resets; a scheduled time passing does not mean your account has been reset. This feature starts off and displays information only in the details menu.
+**Codex reset status** shows the latest reset, scheduled announcements, and AI forecasts from [Codex Resets](https://codex-resets.com) in compact rows in the details menu. This experimental feature is on by default; you can turn it off in **Settings → Details → Experimental**. It reads the site's [public status API](https://codex-resets.com/api/docs) with each usage refresh and **Refresh Now**. Click a row to open the original post, or hover to read its text. Forecasts come from this community service and are not confirmed resets; a scheduled time passing does not mean your account has been reset.
 
 ### Updates
 
