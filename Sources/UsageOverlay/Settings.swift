@@ -23,7 +23,7 @@ final class Settings: ObservableObject {
     /// CLI를 흔치 않은 곳에 깔았을 때 직접 지정하는 자리. 비어 있으면 알려진 설치 위치를 훑는다.
     @Pref("path.claude", .general) var claudePath = ""
     @Pref("path.codex", .general) var codexPath = ""
-    /// 하루 한 번 새 버전이 나왔는지 본다. 앱이 스스로 네트워크를 쓰는 유일한 자리라 끌 수 있게 둔다.
+    /// 하루 한 번 새 버전이 나왔는지 본다. 끄면 업데이트 서버를 조회하지 않는다.
     @Pref("autoUpdate", .updates) var autoUpdate = true
 
     // MARK: - 메뉴바
@@ -79,6 +79,8 @@ final class Settings: ObservableObject {
     @Pref("details.pace", .details) var detailsPace = false
     @Pref("details.updated", .details) var detailsUpdated = true
     @Pref("details.width", .details) var detailsWidth = 300.0
+    /// 공개 reset 상태·예고·예측. 실험 기능이라 사용자가 켜기 전에는 요청하지 않는다.
+    @Pref("details.codexResets", .details) var detailsCodexResets = false
 
     // MARK: - 오버레이
 

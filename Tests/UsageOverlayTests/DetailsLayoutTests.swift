@@ -14,6 +14,7 @@ final class DetailsLayoutTests: XCTestCase {
             "details.claude": true, "details.codex": false,
             "details.claude.window": "all", "details.updated": true,
             "details.width": 300.0, "details.pace": false,
+            "details.codexResets": false,
         ], forName: "NSArgumentDomain")
     }
 

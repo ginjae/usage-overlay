@@ -90,13 +90,15 @@ Settings is laid out like System Settings. Search the sidebar to find the pane f
 
 In **Details** and **Overlay**, **Selected Windows** lets you pick each provider's windows one by one.
 
+In **Settings → Details → Experimental**, turn on **Codex reset status** to show the latest reset, scheduled announcements, and AI forecasts from [Codex Resets](https://codex-resets.com). It reads the site's [public status API](https://codex-resets.com/api/docs) with each usage refresh and **Refresh Now**. Forecasts come from this community service and are not confirmed resets; a scheduled time passing does not mean your account has been reset. This feature starts off and displays information only in the details menu.
+
 ### Updates
 
 Once a day the app checks GitHub for a new version and asks before installing it. It verifies the download against its SHA-256 checksum when one is published, checks the app identifier and version, then replaces itself and reopens. Your settings are kept. A red badge in the Settings sidebar marks a new version, and **Settings → Updates** shows what's new. The app has to be in a folder it can write to, such as `/Applications`.
 
 ### Privacy
 
-The app's own network requests are GitHub release checks and update downloads. They carry no usage data or credentials. Usage is queried by the CLIs with their own sign-in; the app reads their output and never reads stored credentials. There is no telemetry. You can turn off update checks in **Settings → Updates**.
+The app's own network requests are GitHub release checks and update downloads, plus the public codex-resets.com status API when its experimental feature is enabled. These requests carry no usage data or credentials. Usage is queried by the CLIs with their own sign-in; the app reads their output and never reads stored credentials. There is no telemetry. You can turn off update checks in **Settings → Updates** and Codex reset status in **Settings → Details**.
 
 ## Troubleshooting
 

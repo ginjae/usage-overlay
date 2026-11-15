@@ -485,6 +485,12 @@ struct DetailsPane: View {
                 SliderRow(title: "Width", value: $settings.detailsWidth, range: 240...460, step: 10)
             }
 
+            Section("Experimental") {
+                Toggle("Codex reset status", isOn: $settings.detailsCodexResets)
+                Caption("Show the latest reset, scheduled announcements, and AI forecasts from Codex Resets. Refreshes with your usage.")
+                Link("About Codex Resets", destination: CodexResetsStore.website)
+            }
+
             RestoreDefaults(section: .details)
         }
         .formStyle(.grouped)

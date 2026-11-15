@@ -28,6 +28,10 @@ struct DetailsView: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
+            if settings.detailsCodexResets {
+                Divider()
+                CodexResetsDetails(feed: store.codexResets, now: store.now)
+            }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)

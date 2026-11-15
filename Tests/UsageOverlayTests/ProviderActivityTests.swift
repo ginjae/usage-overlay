@@ -21,6 +21,7 @@ final class ProviderActivityTests: XCTestCase {
         let defaults: [String: Any] = [
             "menuBarClaude": false, "menuBarCodex": false,
             "details.claude": false, "details.codex": false,
+            "details.codexResets": false,
             "overlayClaude": true, "overlayCodex": true, "overlayVisible": false,
             "refreshSeconds": 300,
         ]

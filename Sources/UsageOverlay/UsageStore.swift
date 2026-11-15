@@ -4,6 +4,7 @@ import Foundation
 /// 주기적으로 두 CLI를 돌려 스냅샷을 갱신한다.
 /// 한쪽이 실패하면 그쪽만 직전 값을 유지한다. 둘을 같이 비우면 화면이 통째로 깜빡인다.
 final class UsageStore: ObservableObject {
+    let codexResets: CodexResetsStore
     @Published private(set) var snapshot = Snapshot()
     /// 남은 시간과 갱신 시각은 분 단위로만 표시한다.
     @Published private(set) var now = Date()
@@ -14,15 +15,18 @@ final class UsageStore: ObservableObject {
         var claude: Bool
         var codex: Bool
         var interval: TimeInterval
+        var codexResets = false
 
         static var preferences: Self {
             let settings = Settings.shared
             // 갱신마다 CLI를 두 개 띄우고 서버에 물어본다. 너무 잦으면 얻는 것 없이 시끄럽다.
             return Self(claude: settings.reads(.claude), codex: settings.reads(.codex),
-                        interval: TimeInterval(max(30, settings.refreshSeconds)))
+                        interval: TimeInterval(max(30, settings.refreshSeconds)),
+                        codexResets: settings.detailsCodexResets)
         }
 
         var hasProviders: Bool { claude || codex }
+        var hasSources: Bool { hasProviders || codexResets }
     }
 
     enum SuspensionReason { case systemSleep, displaySleep, inactiveSession }
@@ -40,10 +44,12 @@ final class UsageStore: ObservableObject {
 
     init(configuration: @escaping () -> Configuration = { .preferences },
          currentDate: @escaping () -> Date = Date.init,
+         codexResets: CodexResetsStore = CodexResetsStore(),
          readClaude: @escaping () -> ProviderUsage = ClaudeReader.read,
          readCodex: @escaping () -> ProviderUsage = CodexReader.read) {
         self.configuration = configuration
         self.currentDate = currentDate
+        self.codexResets = codexResets
         self.readClaude = readClaude
         self.readCodex = readCodex
     }
@@ -56,6 +62,7 @@ final class UsageStore: ObservableObject {
 
     func stop() {
         isRunning = false
+        codexResets.setEnabled(false)
         invalidateTimers()
     }
 
@@ -76,12 +83,14 @@ final class UsageStore: ObservableObject {
 
     func settingsChanged() {
         let config = configuration()
+        codexResets.setEnabled(isRunning && suspensionReasons.isEmpty && config.codexResets)
+        if config.codexResets, codexResets.lastChecked == nil { codexResets.refresh() }
         var next = snapshot
         if !config.claude { next.claude = nil }
         if !config.codex { next.codex = nil }
         if next != snapshot { snapshot = next }
 
-        guard isRunning, suspensionReasons.isEmpty, config.hasProviders else {
+        guard isRunning, suspensionReasons.isEmpty, config.hasSources else {
             invalidateTimers()
             return
         }
@@ -99,6 +108,7 @@ final class UsageStore: ObservableObject {
 
         let missingProvider = (config.claude && snapshot.claude == nil)
             || (config.codex && snapshot.codex == nil)
+            || (config.codexResets && codexResets.lastChecked == nil)
         let isDue = lastRefresh.map { currentDate().timeIntervalSince($0) >= config.interval } ?? true
         if !isRefreshing && (missingProvider || isDue) {
             refresh()
@@ -119,7 +129,7 @@ final class UsageStore: ObservableObject {
         refreshTimer?.invalidate()
         refreshTimer = nil
         let config = configuration()
-        guard isRunning, suspensionReasons.isEmpty, config.hasProviders, !isRefreshing,
+        guard isRunning, suspensionReasons.isEmpty, config.hasSources, !isRefreshing,
               let lastRefresh else { return }
         let delay = max(1, lastRefresh.addingTimeInterval(config.interval).timeIntervalSince(currentDate()))
         let timer = Timer(timeInterval: delay, repeats: false) { [weak self] _ in self?.refresh() }
@@ -133,7 +143,8 @@ final class UsageStore: ObservableObject {
         // 그 사이 타이머가 또 부르면 프로세스가 쌓이므로 진행 중이면 건너뛴다.
         guard isRunning, suspensionReasons.isEmpty, !isRefreshing else { return }
         let config = configuration()
-        guard config.hasProviders else { return }
+        guard config.hasSources else { return }
+        codexResets.refresh()
         refreshTimer?.invalidate()
         refreshTimer = nil
         lastRefresh = currentDate()

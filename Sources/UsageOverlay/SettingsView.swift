@@ -173,7 +173,7 @@ struct SettingsView: View {
             case .menuBar:
                 return "preview providers windows text show percent left used window label percent sign between windows separator reset time countdown logo clock ring lit unlit logo size font weight fixed-width digits color spacing hover tooltip"
             case .details:
-                return "menu preview providers windows selected percent left used plan bar time to reset reset time pace last updated width"
+                return "menu preview providers windows selected percent left used plan bar time to reset reset time pace last updated width experimental codex reset status announcements scheduled watch forecasts"
             case .overlay:
                 return "floating panel visibility show overlay opacity click through lock position reset position providers windows selected provider name plan window name bar percent time to reset last updated refresh button width text size bar thickness background material liquid glass corner radius border every space keep above other windows"
             case .colors:
