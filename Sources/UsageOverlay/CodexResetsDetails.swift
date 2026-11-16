@@ -8,9 +8,11 @@ struct CodexResetsDetails: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Link("Codex Resets ↗", destination: CodexResetsStore.website)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                Hovering { hovered in
+                    Link("Codex Resets ↗", destination: CodexResetsStore.website)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(hovered ? .primary : .secondary)
+                }
                 Spacer(minLength: 4)
                 if feed.isRefreshing {
                     ProgressView().controlSize(.mini)
@@ -52,30 +54,35 @@ struct CodexResetsDetails: View {
                 .foregroundStyle(.secondary)
                 .frame(width: 62, alignment: .leading)
                 .padding(.top, 2)
-            if let link = source.link {
-                Link(destination: link) { valueLabel(value, detail: detail, linked: true) }
-                    .buttonStyle(.plain)
-            } else {
-                valueLabel(value, detail: detail, linked: false)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(value).font(.callout.weight(.medium))
+                if let link = source.link {
+                    sourceLink(detail, to: link)
+                } else {
+                    caption(detail).lineLimit(2)
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .help(text)
     }
 
-    private func valueLabel(_ value: String, detail: String, linked: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 4) {
-                Text(value).font(.callout.weight(.medium))
-                if linked {
-                    Image(systemName: "arrow.up.right")
-                        .font(.system(size: 8, weight: .medium))
-                        .foregroundStyle(.secondary)
-                }
+    /// 값은 늘 진해서 포인터를 올려도 달라질 게 없으므로, 회색인 보조 줄을 링크로 삼아 올리면 진해지게 한다.
+    private func sourceLink(_ detail: String, to link: URL) -> some View {
+        let arrow = Text(Image(systemName: "arrow.up.right")).font(.system(size: 8, weight: .medium))
+        return Hovering { hovered in
+            Link(destination: link) {
+                // 줄이 넘어가도 화살표만 따로 떨어지지 않게 붙여 둔다.
+                Text("\(detail)\u{00A0}\(arrow)")
+                    .font(.caption)
+                    .foregroundStyle(hovered ? .primary : .secondary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    // 글자 사이 빈틈에서도 눌리게 한다.
+                    .contentShape(Rectangle())
             }
-            .foregroundStyle(.primary)
-            caption(detail).lineLimit(2)
+            .buttonStyle(.plain)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func caption(_ text: String) -> some View {
@@ -85,5 +92,20 @@ struct CodexResetsDetails: View {
     private func date(_ date: Date) -> String {
         date.formatted(.dateTime.month(.abbreviated).day()) + " · "
             + date.formatted(.dateTime.hour().minute())
+    }
+}
+
+/// 포인터가 올라와 있는지를 내용에 넘겨, 눌리는 글자만 진해지게 한다.
+private struct Hovering<Content: View>: View {
+    @ViewBuilder let content: (Bool) -> Content
+    @State private var hovered = false
+
+    var body: some View {
+        content(hovered)
+            .onHover { hovered = $0 }
+            // 링크를 누르면 포인터가 올라온 채로 메뉴가 닫히므로, 다음에 열 때 진한 채로 남지 않게 푼다.
+            .onReceive(NotificationCenter.default.publisher(for: NSMenu.didEndTrackingNotification)) { _ in
+                hovered = false
+            }
     }
 }
