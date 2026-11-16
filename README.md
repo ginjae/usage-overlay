@@ -61,7 +61,7 @@ By default the menu bar shows every window for each provider. In **Settings → 
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/details-dark.png">
-  <img src="docs/details.png" width="356" alt="The details menu: Refresh Now, last updated time, Claude's 5-hour and Weekly windows and Codex's Weekly window with bars and reset times, then the app's commands.">
+  <img src="docs/details.png" width="356" alt="The details menu: Refresh Now, last updated time, Claude's 5-hour and Weekly windows and Codex's Weekly window with bars and reset times, Codex reset status, then the app's commands.">
 </picture>
 
 Click the menu bar item for the details menu. It lists each window's time to reset and the weekday and time it resets. Turn on **Pace** in **Settings → Details** to see whether your current rate will use up a window before it resets. Codex plans **Pro 100**, **Pro 200**, and **Pro 500** are the [ChatGPT Pro tiers](https://learn.chatgpt.com/docs/pricing) at $100, $200, and $500 a month.
