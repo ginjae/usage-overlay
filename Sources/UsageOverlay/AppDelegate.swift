@@ -129,7 +129,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(item("Reset Overlay Position", #selector(resetOverlayPosition)))
         menu.addItem(.separator())
         menu.addItem(item("Settings…", #selector(openSettings), key: ","))
-        menu.addItem(item("Check for Updates…", #selector(checkForUpdatesFromMenu)))
+        let updates = item("Check for Updates…", #selector(checkForUpdatesFromMenu))
+        // Liquid Glass 에서는 시스템이 Settings… 에 톱니를 붙인다. 바로 아래 항목도 기호를 달아 글자 줄을 맞춘다.
+        if drawsLiquidGlass {
+            updates.image = NSImage(systemSymbolName: "arrow.down.circle", accessibilityDescription: nil)
+            // macOS 27 은 앱이 단 그림을 기본으로 감춘다. 보이게 하는 속성은 27 SDK 에만 있어서,
+            // 26 SDK 로 빌드해도 켜지도록 이름으로 넣는다. (1 = NSMenuItem.ImageVisibility.visible)
+            if updates.responds(to: NSSelectorFromString("setPreferredImageVisibility:")) {
+                updates.setValue(1, forKey: "preferredImageVisibility")
+            }
+        }
+        menu.addItem(updates)
         menu.addItem(.separator())
         menu.addItem(item("Quit Usage Overlay", #selector(quit), key: "q"))
         return menu
