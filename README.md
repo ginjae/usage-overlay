@@ -94,7 +94,7 @@ In **Details** and **Overlay**, **Selected Windows** lets you pick each provider
 
 ### Updates
 
-Once a day the app checks GitHub for a new version and asks before installing it. It verifies the download against its SHA-256 checksum when one is published, checks the app identifier and version, then replaces itself and reopens. Your settings are kept. A red badge in the Settings sidebar marks a new version, and **Settings → Updates** shows what's new. The app has to be in a folder it can write to, such as `/Applications`.
+Once a day the app checks GitHub for a new version and asks before installing it. It verifies the download against its SHA-256 checksum when one is published, checks the app identifier and version, then replaces itself and reopens. Your settings are kept. A red badge in the Settings sidebar marks a new version, and **Settings → Updates** shows what's new. To check right away, choose **Check for Updates…** in the details menu. The app has to be in a folder it can write to, such as `/Applications`.
 
 ### Privacy
 

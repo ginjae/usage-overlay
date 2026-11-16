@@ -129,6 +129,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(item("Reset Overlay Position", #selector(resetOverlayPosition)))
         menu.addItem(.separator())
         menu.addItem(item("Settings…", #selector(openSettings), key: ","))
+        menu.addItem(item("Check for Updates…", #selector(checkForUpdatesFromMenu)))
         menu.addItem(.separator())
         menu.addItem(item("Quit Usage Overlay", #selector(quit), key: "q"))
         return menu
@@ -198,6 +199,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // MARK: - 업데이트
 
     private func checkForUpdates() { updater.check(userInitiated: true) }
+
+    /// 결과는 설정 창의 Updates 쪽이 그린다. 메뉴에서 부르면 그쪽을 펼쳐 놓고 묻는다.
+    @objc private func checkForUpdatesFromMenu() {
+        settingsWindow.show(.updates)
+        checkForUpdates()
+    }
 
     private func openReleasesPage() { NSWorkspace.shared.open(Updater.releasesPage) }
 

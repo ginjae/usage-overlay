@@ -46,7 +46,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
-    func show() {
+    /// 쪽을 주면 그쪽을 펼쳐서 연다. 안 주면 보던 쪽 그대로다.
+    func show(_ pane: SettingsView.Pane? = nil) {
+        if let pane { navigation.open(pane) }
         NSApp.setActivationPolicy(.regular)
         showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
