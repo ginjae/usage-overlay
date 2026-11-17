@@ -553,6 +553,10 @@ struct OverlayPane: View {
                           choices: OverlayBackground.choices, label: \.title)
                 SliderRow(title: "Corner radius", value: $settings.overlayCornerRadius, range: 0...24, step: 1)
                 Toggle("Border", isOn: $settings.overlayBorder)
+                    .disabled(settings.overlayBackground.usesLiquidGlass)
+                if settings.overlayBackground.usesLiquidGlass {
+                    Caption("Liquid Glass has its own reflective edge.")
+                }
             }
 
             Section("Window") {

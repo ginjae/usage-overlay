@@ -27,6 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var autoUpdate = Settings.shared.autoUpdate
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        Prefs.migrateOverlayToLiquidGlass()
         NSApp.mainMenu = makeMainMenu()
 
         panel = OverlayPanel(store: store)

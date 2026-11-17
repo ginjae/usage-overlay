@@ -11,6 +11,17 @@ enum Prefs {
         static let topLeftY = "topLeftY"
         static let skippedVersion = "skippedVersion"
         static let lastUpdateCheck = "lastUpdateCheck"
+        static let liquidGlassMigration = "migration.overlayLiquidGlass.v1"
+    }
+
+    /// 이 버전을 처음 실행할 때 한 번만 새 바탕을 적용한다.
+    /// 지원하지 않는 Mac 에서는 기록하지 않아, 나중에 OS 를 올리면 그때 적용한다.
+    /// Settings 의 기본값 복원과 별개인 기록이라 사용자가 다시 고른 바탕을 덮어쓰지 않는다.
+    static func migrateOverlayToLiquidGlass(in defaults: UserDefaults = Prefs.defaults,
+                                           supported: Bool = drawsLiquidGlass) {
+        guard supported, !defaults.bool(forKey: Key.liquidGlassMigration) else { return }
+        defaults.set(OverlayBackground.liquidGlass.stored, forKey: "overlay.background")
+        defaults.set(true, forKey: Key.liquidGlassMigration)
     }
 
     /// "Skip This Version" 으로 접어 둔 버전. 자동 검사에서만 무시하고, 직접 물으면 다시 보여 준다.

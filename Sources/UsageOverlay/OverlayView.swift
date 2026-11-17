@@ -26,12 +26,15 @@ struct OverlayView: View {
         .padding(.horizontal, 12 * scale)
         .padding(.vertical, 11 * scale)
         .frame(width: settings.overlayWidth, alignment: .leading)
-        .modifier(Backdrop(background: settings.overlayBackground, shape: shape))
+        .modifier(Backdrop(background: settings.overlayBackground, shape: shape,
+                           interactive: !settings.overlayClickThrough))
         .overlay {
-            if settings.overlayBorder {
+            // Liquid Glass 의 반사선은 Backdrop 에서 그리므로 일반 테두리를 겹치지 않는다.
+            if settings.overlayBorder && !settings.overlayBackground.usesLiquidGlass {
                 shape.strokeBorder(Color.white.opacity(0.13), lineWidth: 1)
             }
         }
+        .contentShape(shape)
         .opacity(settings.overlayOpacity)
         .modifier(WindowDrag(enabled: !settings.overlayLocked))
     }
@@ -93,13 +96,27 @@ private struct WindowDrag: ViewModifier {
 
 /// 고른 바탕을 패널 모양대로 깐다.
 private struct Backdrop: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
     let background: OverlayBackground
     let shape: RoundedRectangle
+    let interactive: Bool
 
     @ViewBuilder func body(content: Content) -> some View {
         #if compiler(>=6.2)
         if #available(macOS 26, *), background == .liquidGlass {
-            content.glassEffect(.regular, in: shape)
+            content
+                .glassEffect(.clear.interactive(interactive), in: shape)
+                // 맑은 유리 아래에 옅은 바탕을 두어 밝고 어두운 배경 모두에서 글자를 읽을 수 있게 한다.
+                .background((colorScheme == .dark ? Color.black : Color.white)
+                    .opacity(colorScheme == .dark ? 0.3 : 0.45), in: shape)
+                .overlay {
+                    shape.strokeBorder(
+                        LinearGradient(colors: [.white.opacity(0.6), .white.opacity(0.08),
+                                                .white.opacity(0.28)],
+                                       startPoint: .topLeading, endPoint: .bottomTrailing),
+                        lineWidth: 0.6)
+                        .allowsHitTesting(false)
+                }
         } else {
             content.background(background.style, in: shape)
         }

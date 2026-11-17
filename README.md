@@ -68,7 +68,7 @@ Click the menu bar item for the details menu. It lists each window's time to res
 
 ### Overlay
 
-The overlay starts hidden and shows **5-hour** and **Weekly** for each provider. It floats above other windows on every Space, including full screen, and stays where you drag it. Set its opacity, click-through, columns, size, and background in **Settings → Overlay**. On macOS 26 and later, the background options include Liquid Glass.
+The overlay starts hidden and shows **5-hour** and **Weekly** for each provider. It floats above other windows on every Space, including full screen, and stays where you drag it. Set its opacity, click-through, columns, size, and background in **Settings → Overlay**. Choose **Glass**, **Solid**, or, on macOS 26 and later, **Liquid Glass** with a clear, reflective surface that responds to pointer interactions. Liquid Glass keeps its active appearance while you work in other apps and is the default on supported Macs. Your first launch after updating to v1.5.0 selects Liquid Glass once; any background you choose afterward is kept. Earlier Clear Glass, Light Glass, and Frosted Glass selections now use Glass.
 
 ### Settings
 
@@ -110,6 +110,8 @@ The app's own network requests are GitHub release checks and update downloads, p
 ## Build from source
 
 Requires Swift 6 or later, from Xcode or its Command Line Tools. Build with Xcode 26 or later to get the Liquid Glass look on macOS 26 and later. With an older SDK the app keeps the previous look, and the script warns about it.
+
+Keeping Liquid Glass active without keyboard focus relies on AppKit's private `_hasActiveAppearance` selector, scoped to the overlay's Liquid Glass background. If a future macOS stops using that selector, the system's normal inactive appearance returns.
 
 ```bash
 ./scripts/bundle.sh               # → build/Usage Overlay.app

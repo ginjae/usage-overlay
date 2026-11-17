@@ -1,4 +1,5 @@
 import AppKit
+import ObjectiveC.runtime
 import SwiftUI
 
 /// 모든 스페이스·전체화면 위에 떠 있는 테두리 없는 HUD 패널.
@@ -9,6 +10,21 @@ final class OverlayPanel: NSPanel {
     private let store: UsageStore
     /// 띄워 둔 상태. 다른 Space 에 가 있으면 `isVisible` 이 거짓이라 따로 센다.
     private var shown = false
+    private var keepsGlassActive = false
+
+    private static let activeAppearanceSelector = NSSelectorFromString("_hasActiveAppearance")
+    private typealias ActiveAppearance = @convention(c) (NSWindow, Selector) -> Bool
+    private static let systemActiveAppearance: ActiveAppearance? = {
+        guard let method = class_getInstanceMethod(NSPanel.self, activeAppearanceSelector) else { return nil }
+        return unsafeBitCast(method_getImplementation(method), to: ActiveAppearance.self)
+    }()
+
+    /// AppKit 의 비공개 외형 판정. SwiftUI 의 appearsActive 는 유리의 비활성 재질을 막지 못한다.
+    /// Liquid Glass 에서만 활성 외형을 유지하고, 실제 key/main 상태와 입력 포커스는 바꾸지 않는다.
+    /// 다른 바탕은 원래 NSPanel 구현을 따른다. macOS 가 이 판정을 없애면 시스템 재질로 돌아간다.
+    @objc(_hasActiveAppearance) private dynamic func activeAppearance() -> Bool {
+        keepsGlassActive || Self.systemActiveAppearance?(self, Self.activeAppearanceSelector) == true
+    }
 
     init(store: UsageStore) {
         self.store = store
@@ -38,6 +54,7 @@ final class OverlayPanel: NSPanel {
 
     /// 창의 성질을 설정에 맞춘다. 내용은 OverlayView 가 설정을 직접 따라 그린다.
     func apply(_ settings: Settings) {
+        keepsGlassActive = settings.overlayBackground.usesLiquidGlass
         ignoresMouseEvents = settings.overlayClickThrough
         level = settings.overlayAlwaysOnTop ? .floating : .normal
         collectionBehavior = settings.overlayAllSpaces
@@ -48,6 +65,12 @@ final class OverlayPanel: NSPanel {
             isMovableByWindowBackground = !settings.overlayLocked
         }
         if settings.overlayVisible != shown { setVisible(settings.overlayVisible) }
+        // SwiftUI 에서 유리를 자르면 반사까지 사라질 수 있어 창의 합성 경계에서 자른다.
+        // 효과가 사각 창 끝까지 새어 둥근 모서리 바깥에 남지 않도록 한다.
+        contentView?.wantsLayer = true
+        contentView?.layer?.cornerRadius = settings.overlayCornerRadius
+        contentView?.layer?.cornerCurve = .continuous
+        contentView?.layer?.masksToBounds = true
     }
 
     /// 숨긴 패널이 시계와 스냅샷을 구독하며 레이아웃을 계산하지 않도록 뷰도 해제한다.
