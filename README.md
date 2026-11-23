@@ -116,9 +116,10 @@ Keeping Liquid Glass active without keyboard focus relies on AppKit's private `_
 ```bash
 ./scripts/bundle.sh               # → build/Usage Overlay.app
 ./scripts/bundle.sh --universal   # Apple Silicon and Intel
+./scripts/bundle.sh --install     # also replaces the installed app
 swift test
 ```
 
-Set `APP_VERSION` and `BUILD_NUMBER` for the bundle's version (defaults: `0.1.0` and `1`). The tests run against a small local CLI fixture and never query your accounts.
+Set `APP_VERSION` and `BUILD_NUMBER` for the bundle's version (defaults: `0.1.0` and `1`; with `--install`, the latest release's version, so the app still offers the next release). The tests run against a small local CLI fixture and never query your accounts.
 
 [About the screenshots](docs/README.md)

@@ -1,23 +1,28 @@
 #!/usr/bin/env bash
-# 릴리스 빌드 후 실행 가능한 .app 번들을 build/ 에 만든다.
+# 릴리스 빌드 후 실행 가능한 .app 번들을 build/ 에 만든다. --install 을 주면 설치된 앱을 이것으로 바꾼다.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
-APP_VERSION="${APP_VERSION:-0.1.0}"
+APP_VERSION="${APP_VERSION:-}"
 BUILD_NUMBER="${BUILD_NUMBER:-1}"
 UNIVERSAL=0
+INSTALL=0
 
 usage() {
   cat <<'USAGE'
-Usage: ./scripts/bundle.sh [--universal]
+Usage: ./scripts/bundle.sh [--universal] [--install]
 
 Environment variables:
-  APP_VERSION    Three-part app version (default: 0.1.0)
+  APP_VERSION    Three-part app version (default: 0.1.0; with --install,
+                 the latest release's)
   BUILD_NUMBER   Numeric bundle build number (default: 1)
+  INSTALL_DIR    Where --install puts the app (default: where it's
+                 installed already, else /Applications)
 
 --universal builds a binary that runs natively on both Apple Silicon and Intel.
+--install also replaces the installed app with the build.
 USAGE
 }
 
@@ -30,6 +35,9 @@ while (($#)); do
   case "$1" in
     --universal)
       UNIVERSAL=1
+      ;;
+    --install)
+      INSTALL=1
       ;;
     -h|--help)
       usage
@@ -44,6 +52,13 @@ while (($#)); do
 done
 
 [[ "$(uname -s)" == "Darwin" ]] || die "Usage Overlay can only be built on macOS."
+
+# 설치한 앱은 GitHub 에서 새 버전을 확인한다. 최신 릴리스의 버전을 달아야 다음 릴리스가 계속 제안된다.
+if [[ -z "$APP_VERSION" ]] && ((INSTALL)); then
+  LATEST_TAG="$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || true)"
+  APP_VERSION="${LATEST_TAG#v}"
+fi
+APP_VERSION="${APP_VERSION:-0.1.0}"
 
 if ! command -v xcrun >/dev/null 2>&1 || ! xcrun --find swift >/dev/null 2>&1; then
   cat >&2 <<'ERROR'
@@ -184,4 +199,42 @@ if ((UNIVERSAL)); then
   echo "Universal 앱 빌드 완료 (macOS $LINKED_SDK SDK) → $PWD/$APP"
 else
   echo "$(uname -m) 앱 빌드 완료 (macOS $LINKED_SDK SDK) → $PWD/$APP"
+fi
+
+# 설치된 앱을 바꾸고, Launch Services 에는 그 사본만 등록해 둔다. 같은 번들 ID 의 다른 사본(build/ 의 것,
+# 백업, 테스트용 사본, 지웠지만 등록이 남은 사본)이 있으면 macOS 가 그 사본으로 파일을 열거나 그 사본의
+# 문서 타입 선언을 쓸 수 있다. 설치 위치는 INSTALL_DIR, 없으면 이미 설치된 곳(~/Applications 에만 있으면
+# 그곳), 처음이면 /Applications 이다.
+install_app() {
+  local lsregister=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+  local name dir dest id executable
+  name="$(basename "$APP")"
+  dir="${INSTALL_DIR:-/Applications}"
+  if [[ -z "${INSTALL_DIR:-}" && ! -e "$dir/$name" && -e "$HOME/Applications/$name" ]]; then
+    dir="$HOME/Applications"
+  fi
+  dest="$dir/$name"
+  id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")"
+  executable="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Contents/Info.plist")"
+  mkdir -p "$dir"
+  rm -rf "$dest"
+  cp -R "$APP" "$dest"
+  "$lsregister" -dump Bundle | awk -v id="$id" -v keep="$dest" '
+    function flush() { if (same && path != "" && path != keep) print path; same = 0; path = "" }
+    /^-+$/ { flush() }
+    /^identifier:/ { same = ($2 == id) }
+    /^path:/ { sub(/^path:[ \t]+/, ""); sub(/ \(0x[0-9a-f]+\)$/, ""); path = $0 }
+    END { flush() }' | sort -u | while IFS= read -r copy; do
+    "$lsregister" -u "$copy"
+    echo "Unregistered $copy"
+  done
+  "$lsregister" -f "$dest"
+  echo "Installed $dest"
+  if pgrep -qx "$executable"; then
+    echo "note: ${name%.app} is still running the previous build. Quit and reopen it to use this one."
+  fi
+}
+
+if ((INSTALL)); then
+  install_app
 fi
