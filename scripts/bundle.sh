@@ -78,6 +78,7 @@ CODESIGN="$(xcrun --find codesign 2>/dev/null)" || die "codesign was not found. 
 ICON_SRC="Resources/AppIcon.png"
 # 16 · 32pt 칸은 큰 그림을 줄이면 뭉개져서, 있으면 작은 크기용으로 따로 그린 그림을 쓴다.
 ICON_SMALL_SRC="Resources/AppIcon-small.png"
+ICON_COMPOSER="Resources/AppIcon.icon.json"
 
 if ! SWIFT_VERSION_OUTPUT="$("$SWIFT" --version 2>&1)"; then
   printf '%s\n' "$SWIFT_VERSION_OUTPUT" >&2
@@ -158,7 +159,9 @@ PLIST
 # 1024px 마스터로 아이콘 세트를 만든다. 작은 칸(16 · 32pt)은 작은 크기용 그림이 있으면 그걸 쓴다.
 # 아이콘이 없어도 앱은 돌아가므로 여기서 빌드를 세우지는 않는다.
 if [[ -f "$ICON_SRC" ]] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
-  ICONSET="$(mktemp -d)/AppIcon.iconset"
+  ICON_WORK="$(mktemp -d)"
+  trap 'rm -rf "$ICON_WORK"' EXIT
+  ICONSET="$ICON_WORK/AppIcon.iconset"
   mkdir -p "$ICONSET" "$APP/Contents/Resources"
   while read -r size name small; do
     [[ -n "$size" ]] || continue
@@ -178,7 +181,23 @@ if [[ -f "$ICON_SRC" ]] && command -v sips >/dev/null 2>&1 && command -v iconuti
 1024 icon_512x512@2x
 SIZES
   iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
-  rm -rf "$(dirname "$ICONSET")"
+
+  # macOS 26+ frames legacy-only icons. Supply a native icon stack with artwork
+  # that fills the system mask. Keep the original ICNS alongside the catalog.
+  SDK_VERSION="$(xcrun --sdk macosx --show-sdk-version)"
+  SDK_MAJOR="${SDK_VERSION%%.*}"
+  if [[ "$SDK_MAJOR" =~ ^[0-9]+$ ]] && ((SDK_MAJOR >= 26)) && ACTOOL="$(xcrun --find actool 2>/dev/null)"; then
+    ICON_DOCUMENT="$ICON_WORK/AppIcon.icon"
+    ICON_OUTPUT="$ICON_WORK/compiled"
+    mkdir -p "$ICON_DOCUMENT/Assets" "$ICON_OUTPUT"
+    cp "$ICON_COMPOSER" "$ICON_DOCUMENT/icon.json"
+    cp "$ICON_SRC" "$ICON_DOCUMENT/Assets/Artwork.png"
+    "$ACTOOL" --compile "$ICON_OUTPUT" --platform macosx --target-device mac \
+      --minimum-deployment-target 26.0 --app-icon AppIcon \
+      --output-partial-info-plist "$ICON_WORK/IconInfo.plist" "$ICON_DOCUMENT"
+    cp "$ICON_OUTPUT/Assets.car" "$APP/Contents/Resources/Assets.car"
+    plutil -insert CFBundleIconName -string AppIcon "$APP/Contents/Info.plist"
+  fi
 else
   printf 'warning: %s 로 아이콘을 만들지 못했습니다. 앱은 기본 아이콘으로 빌드됩니다.\n' "$ICON_SRC" >&2
 fi

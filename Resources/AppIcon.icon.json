@@ -1,0 +1,18 @@
+{
+  "fill": { "solid": "srgb:0.055,0.059,0.070,1.0" },
+  "groups": [
+    {
+      "layers": [
+        {
+          "glass": false,
+          "image-name": "Artwork.png",
+          "name": "Usage Overlay",
+          "position": { "scale": 1.16, "translation-in-points": [0, 0] }
+        }
+      ],
+      "shadow": { "kind": "neutral", "opacity": 0 },
+      "specular": false
+    }
+  ],
+  "supported-platforms": { "squares": "shared" }
+}
