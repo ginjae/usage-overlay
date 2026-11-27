@@ -11,6 +11,7 @@ final class DetailsLayoutTests: XCTestCase {
         let defaults = Prefs.defaults
         previousDomain = defaults.volatileDomain(forName: "NSArgumentDomain")
         defaults.setVolatileDomain([
+            "providers.claude": true,
             "details.claude": true, "details.codex": false,
             "details.claude.window": "all", "details.updated": true,
             "details.width": 300.0, "details.pace": false,

@@ -30,9 +30,11 @@ struct GeneralPane: View {
             }
 
             Section("Providers") {
+                Toggle("Claude", isOn: $settings.claudeEnabled)
+                Toggle("Codex", isOn: $settings.codexEnabled)
+                Caption("Turning a provider off hides it and pauses its usage checks.")
                 ChoiceRow(title: "Order", selection: $settings.providerOrder,
                           choices: ProviderOrder.allCases, label: \.title)
-                Caption("Used by the menu bar, the details window, and the overlay.")
             }
 
             Section("Command-line tools") {
@@ -330,9 +332,10 @@ struct MenuBarPane: View {
 
             Section("Providers") {
                 ForEach(settings.providerOrder.providers, id: \.self) { provider in
-                    ProviderRows(provider: provider, shown: provider.menuBarShown, window: provider.menuBarWindow)
+                    ProviderWindowRows(provider: provider, shown: provider.menuBarShown,
+                                       window: provider.menuBarWindow,
+                                       gauges: provider.usage(in: store.snapshot)?.gauges ?? [])
                 }
-                Caption("If a provider doesn't have the window you picked, its tightest window shows instead.")
             }
 
             Section("Text") {

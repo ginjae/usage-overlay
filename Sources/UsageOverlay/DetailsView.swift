@@ -7,12 +7,12 @@ struct DetailsView: View {
     @ObservedObject var settings = Settings.shared
 
     private var providers: [Provider] {
-        settings.providerOrder.providers.filter { settings[keyPath: $0.detailsShown] }
+        settings.enabledProviders.filter { settings[keyPath: $0.detailsShown] }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if settings.detailsUpdated {
+            if settings.detailsUpdated, !providers.isEmpty {
                 Text(store.isRefreshing ? "Refreshing…"
                      : Format.freshness(of: providers.compactMap { $0.usage(in: store.snapshot) }, from: store.now))
                     .font(.caption)
@@ -24,11 +24,13 @@ struct DetailsView: View {
                 ProviderDetails(provider: provider, usage: provider.usage(in: store.snapshot), now: store.now)
             }
             if providers.isEmpty {
-                Text("No providers shown. Turn one on in Settings → Details.")
+                Text(settings.enabledProviders.isEmpty
+                     ? "No providers enabled. Turn one on in Settings → General."
+                     : "No providers shown. Turn one on in Settings → Details.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
-            if settings.detailsCodexResets {
+            if settings.showsCodexResetStatus {
                 Divider()
                 CodexResetsDetails(feed: store.codexResets, now: store.now)
             }

@@ -48,7 +48,7 @@ Codex has no usage subcommand, so the app starts the same app server the Codex T
 {"id":1,"method":"account/rateLimits/read"}
 ```
 
-It refreshes every 5 minutes (**Settings → General**) and pauses while the Mac or display sleeps. A provider's CLI runs only while that provider is shown in the menu bar, the details menu, or a visible overlay.
+It refreshes every 5 minutes (**Settings → General**) and pauses while the Mac or display sleeps. A provider's CLI runs while the provider is enabled in **Settings → General → Providers** and shown in the menu bar, the details menu, or a visible overlay.
 
 ### Menu bar and details
 
@@ -57,7 +57,7 @@ It refreshes every 5 minutes (**Settings → General**) and pauses while the Mac
   <img src="docs/menubar.png" width="142" alt="The menu bar item on light and dark menu bars: Claude's logo clock with 62% and 43% left, and Codex's with 86% left.">
 </picture>
 
-By default the menu bar shows every window for each provider. In **Settings → Menu Bar** you can show one window or the **Tightest Window** (the one with the least left), add labels such as `5h 39%`, or switch to **Percent Used**.
+By default the menu bar shows every window for each provider. In **Settings → Menu Bar** you can check individual windows or choose **Tightest** to show the window with the least left. You can also add labels such as `5h 39%` or switch to **Percent Used**.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/details-dark.png">
@@ -81,14 +81,14 @@ Settings is laid out like System Settings. Search the sidebar to find the pane f
 
 | Pane | What you can change |
 |---|---|
-| **General** | Launch at login, refresh interval, provider order, CLI locations |
+| **General** | Launch at login, refresh interval, provider switches and order, CLI locations |
 | **Updates** | Installed version, release notes, automatic checks |
 | **Menu Bar** | Windows, percent left or used, reset time, appearance, tooltip |
 | **Details** | Windows, percent left or used, which lines to show, width |
 | **Overlay** | Visibility, opacity, click-through, position lock, windows and columns, size, background, Spaces |
 | **Colors** | Level colors and where each starts, provider logo colors |
 
-In **Details** and **Overlay**, **Selected Windows** lets you pick each provider's windows one by one.
+In **Menu Bar**, **Details**, and **Overlay**, select the windows you want under Claude and Codex. Right-click the **Windows** row for **All** or **Tightest**.
 
 **Codex reset status** shows the latest reset, scheduled announcements, and AI forecasts from [Codex Resets](https://codex-resets.com) in compact rows in the details menu. This experimental feature is on by default; you can turn it off in **Settings → Details → Experimental**. It reads the site's [public status API](https://codex-resets.com/api/docs) with each usage refresh and **Refresh Now**. Click the ↗ line in a row to open the original post, or hover the row to read its text. Forecasts come from this community service and are not confirmed resets; a scheduled time passing does not mean your account has been reset.
 

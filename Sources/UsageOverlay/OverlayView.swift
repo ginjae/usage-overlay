@@ -5,7 +5,7 @@ struct OverlayView: View {
     @ObservedObject var settings = Settings.shared
 
     private var providers: [Provider] {
-        settings.providerOrder.providers.filter { settings[keyPath: $0.overlayShown] }
+        settings.enabledProviders.filter { settings[keyPath: $0.overlayShown] }
     }
 
     var body: some View {
@@ -20,7 +20,7 @@ struct OverlayView: View {
                     .font(.system(size: 9.5 * scale))
                     .foregroundStyle(.secondary)
             }
-            if settings.overlayFooter { footer }
+            if settings.overlayFooter, !providers.isEmpty { footer }
         }
         .environment(\.now, store.now)
         .padding(.horizontal, 12 * scale)

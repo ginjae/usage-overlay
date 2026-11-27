@@ -20,6 +20,8 @@ final class Settings: ObservableObject {
     /// 갱신마다 CLI를 띄우고 서버에 물어본다. 너무 잦으면 얻는 것 없이 시끄러워서 30초 밑으로는 쓰지 않는다.
     @Pref("refreshSeconds", .general) var refreshSeconds = 300
     @Pref("providerOrder", .general) var providerOrder = ProviderOrder.claudeFirst
+    @Pref("providers.claude", .general) var claudeEnabled = true
+    @Pref("providers.codex", .general) var codexEnabled = true
     /// CLI를 흔치 않은 곳에 깔았을 때 직접 지정하는 자리. 비어 있으면 알려진 설치 위치를 훑는다.
     @Pref("path.claude", .general) var claudePath = ""
     @Pref("path.codex", .general) var codexPath = ""
@@ -31,8 +33,8 @@ final class Settings: ObservableObject {
     @Pref("menuBarClaude", .menuBar) var menuBarClaude = true
     @Pref("menuBarCodex", .menuBar) var menuBarCodex = true
     /// 예전에는 두 공급자가 창 고르기 하나를 같이 썼다. 따로 고르기 전까지는 그 값을 물려받는다.
-    @Pref("menuBar.claude.window", .menuBar, legacy: "menuBarWindow") var menuBarClaudeWindow = WindowChoice.all
-    @Pref("menuBar.codex.window", .menuBar, legacy: "menuBarWindow") var menuBarCodexWindow = WindowChoice.all
+    @Pref("menuBar.claude.window", .menuBar, legacy: "menuBarWindow") var menuBarClaudeWindow = WindowSelection.all
+    @Pref("menuBar.codex.window", .menuBar, legacy: "menuBarWindow") var menuBarCodexWindow = WindowSelection.all
     @Pref("menuBarValue", .menuBar) var menuBarValue = PercentKind.remaining
     /// 숫자 앞 창 이름. 예) `5h 39%`
     @Pref("menuBarLabel", .menuBar) var menuBarLabel = LabelStyle.off
@@ -124,10 +126,14 @@ final class Settings: ObservableObject {
 
     // MARK: - 읽기 도우미
 
+    var enabledProviders: [Provider] { providerOrder.providers.filter { self[keyPath: $0.enabled] } }
+    var showsCodexResetStatus: Bool { codexEnabled && detailsCodexResets }
+
     /// 어느 화면에도 안 띄우는 공급자는 CLI 를 돌릴 이유가 없다.
     /// 갱신마다 프로세스 하나와 몇 초를 아끼고, 안 쓰는 CLI 의 오류도 따라 사라진다.
     func reads(_ provider: Provider) -> Bool {
-        self[keyPath: provider.menuBarShown] || self[keyPath: provider.detailsShown]
+        guard self[keyPath: provider.enabled] else { return false }
+        return self[keyPath: provider.menuBarShown] || self[keyPath: provider.detailsShown]
             || (overlayVisible && self[keyPath: provider.overlayShown])
     }
 

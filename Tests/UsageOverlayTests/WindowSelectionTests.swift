@@ -31,7 +31,17 @@ final class WindowSelectionTests: XCTestCase {
         XCTAssertTrue(WindowSelection.tightest.pick(from: []).isEmpty)
     }
 
-    func testLegacyOverlayChoicesArePreserved() {
+    func testCheckboxesStartFromTheCurrentPreset() {
+        let labels = ["5-hour", "Weekly", "Fable", "Daily"]
+        XCTAssertEqual(WindowSelection.all.setting("Fable", checked: false, in: labels, gauges: gauges),
+                       .selected(["5-hour", "Weekly", "Daily"]))
+        XCTAssertEqual(WindowSelection.tightest.setting("Weekly", checked: true, in: labels, gauges: gauges),
+                       .selected(["Fable", "Weekly"]))
+        XCTAssertEqual(WindowSelection.selected(["Weekly"]).setting("Weekly", checked: false, in: labels, gauges: gauges),
+                       .selected([]))
+    }
+
+    func testLegacySingleWindowChoicesArePreserved() {
         XCTAssertEqual(WindowSelection(stored: "all"), .all)
         XCTAssertEqual(WindowSelection(stored: "tightest"), .tightest)
         XCTAssertEqual(WindowSelection(stored: "fiveHour"), .selected(["5-hour"]))
@@ -79,7 +89,8 @@ final class WindowSelectionTests: XCTestCase {
             "details.codex.window": ["Weekly"],
             "overlay.claude.window": "fable",
             "overlay.codex.window": "tightest",
-            "menuBar.claude.window": "all",
+            "menuBar.claude.window": ["5-hour", "Fable"],
+            "menuBar.codex.window": "weekly",
         ], forName: "NSArgumentDomain")
 
         let settings = Settings.shared
@@ -87,16 +98,39 @@ final class WindowSelectionTests: XCTestCase {
         XCTAssertEqual(settings[keyPath: Provider.codex.detailsWindow], .selected(["Weekly"]))
         XCTAssertEqual(settings[keyPath: Provider.claude.overlayWindow], .selected(["Fable"]))
         XCTAssertEqual(settings[keyPath: Provider.codex.overlayWindow], .tightest)
-        XCTAssertEqual(settings.menuBarClaudeWindow, .all)
+        XCTAssertEqual(settings.menuBarClaudeWindow, .selected(["5-hour", "Fable"]))
+        XCTAssertEqual(settings.menuBarCodexWindow, .selected(["Weekly"]))
+    }
+
+    func testMenuBarRendersTheCheckedWindowsOfBothProviders() {
+        let defaults = Prefs.defaults
+        let previous = defaults.volatileDomain(forName: "NSArgumentDomain")
+        defer { defaults.setVolatileDomain(previous, forName: "NSArgumentDomain") }
+        var preferences: [String: Any] = [
+            "providers.claude": true, "providers.codex": true, "providerOrder": "claudeFirst",
+            "menuBarClaude": true, "menuBarCodex": true,
+            "menuBar.claude.window": ["Fable", "5-hour"], "menuBar.codex.window": ["Daily", "Weekly"],
+            "menuBarLabel": "short", "menuBar.percentSign": true, "menuBarReset": "off", "menuBarValue": "used",
+        ]
+        defaults.setVolatileDomain(preferences, forName: "NSArgumentDomain")
+        let snapshot = Snapshot(claude: ProviderUsage(name: "Claude", gauges: Array(gauges.prefix(3))),
+                                codex: ProviderUsage(name: "Codex", gauges: [gauges[0], gauges[1], gauges[3]]))
+        let now = Date()
+        XCTAssertEqual(MenuBarText.parts(for: snapshot, now: now).map(\.text), ["5h 30%", "Fable 95%", "7d 50%", "1d 10%"])
+
+        preferences["menuBar.claude.window"] = [String]()
+        preferences["menuBar.codex.window"] = ["Monthly"]
+        defaults.setVolatileDomain(preferences, forName: "NSArgumentDomain")
+        XCTAssertEqual(MenuBarText.parts(for: snapshot, now: now).map(\.text), ["–"])
     }
 
     func testSameLabelsHaveDistinctFormIdentitiesAcrossProvidersAndPanes() {
         // Grouped Forms flatten nested ForEach rows. Reused IDs can bind Codex switches to Claude.
-        let preferences = Provider.allCases.flatMap { [$0.detailsWindow, $0.overlayWindow] }
+        let preferences = Provider.allCases.flatMap { [$0.menuBarWindow, $0.detailsWindow, $0.overlayWindow] }
         let rows = preferences.flatMap { preference in
             ["5-hour", "Weekly"].map { WindowToggleID(preference: preference, label: $0) }
         }
-        XCTAssertEqual(Set(rows).count, 8)
+        XCTAssertEqual(Set(rows).count, 12)
     }
 
     func testUpdatedDefaultsApplyWhenPreferencesAreUnsetOrInvalid() {

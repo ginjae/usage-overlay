@@ -115,7 +115,7 @@ final class CodexResetsTests: XCTestCase {
         let previous = defaults.volatileDomain(forName: "NSArgumentDomain")
         defer { defaults.setVolatileDomain(previous, forName: "NSArgumentDomain") }
         defaults.setVolatileDomain([
-            "details.codexResets": true, "details.claude": false, "details.codex": false,
+            "providers.codex": true, "details.codexResets": true, "details.claude": false, "details.codex": false,
             "details.width": 300.0,
         ], forName: "NSArgumentDomain")
         var announcements = true

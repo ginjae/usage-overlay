@@ -22,7 +22,7 @@ final class UsageStore: ObservableObject {
             // 갱신마다 CLI를 두 개 띄우고 서버에 물어본다. 너무 잦으면 얻는 것 없이 시끄럽다.
             return Self(claude: settings.reads(.claude), codex: settings.reads(.codex),
                         interval: TimeInterval(max(30, settings.refreshSeconds)),
-                        codexResets: settings.detailsCodexResets)
+                        codexResets: settings.showsCodexResetStatus)
         }
 
         var hasProviders: Bool { claude || codex }

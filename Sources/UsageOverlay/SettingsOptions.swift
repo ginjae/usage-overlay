@@ -12,6 +12,10 @@ enum Provider: CaseIterable {
         self == .claude ? snapshot.claude : snapshot.codex
     }
 
+    var enabled: ReferenceWritableKeyPath<Settings, Bool> {
+        self == .claude ? \.claudeEnabled : \.codexEnabled
+    }
+
     /// 고를 수 있는 창. Fable 전용 주간 창은 Claude 일부 요금제에만 있다.
     var windowChoices: [WindowChoice] {
         self == .claude ? WindowChoice.allCases : WindowChoice.allCases.filter { $0 != .fable }
@@ -21,7 +25,7 @@ enum Provider: CaseIterable {
         self == .claude ? \.menuBarClaude : \.menuBarCodex
     }
 
-    var menuBarWindow: ReferenceWritableKeyPath<Settings, WindowChoice> {
+    var menuBarWindow: ReferenceWritableKeyPath<Settings, WindowSelection> {
         self == .claude ? \.menuBarClaudeWindow : \.menuBarCodexWindow
     }
 
@@ -114,7 +118,7 @@ struct WindowToggleID: Hashable {
     let label: String
 }
 
-/// 상세 창과 오버레이는 여러 창을 함께 고른다. 선택하지 않은 창으로 대신 표시하지 않는다.
+/// 화면마다 여러 창을 골라 표시할 수 있다.
 enum WindowSelection: Equatable, PrefValue {
     case all, tightest, selected(Set<String>)
 
@@ -123,9 +127,9 @@ enum WindowSelection: Equatable, PrefValue {
 
         var title: String {
             switch self {
-            case .all: return "All Windows"
-            case .selected: return "Selected Windows"
-            case .tightest: return "Tightest Window"
+            case .all: return "All"
+            case .selected: return "Custom"
+            case .tightest: return "Tightest"
             }
         }
     }
@@ -143,8 +147,22 @@ enum WindowSelection: Equatable, PrefValue {
         return []
     }
 
+    func checkedLabels(in labels: [String], gauges: [Gauge]) -> Set<String> {
+        switch self {
+        case .all: return Set(labels)
+        case .tightest: return Set(pick(from: gauges).map(\.label))
+        case .selected(let labels): return labels
+        }
+    }
+
+    func setting(_ label: String, checked: Bool, in labels: [String], gauges: [Gauge]) -> Self {
+        var selected = checkedLabels(in: labels, gauges: gauges)
+        if checked { selected.insert(label) } else { selected.remove(label) }
+        return .selected(selected)
+    }
+
     init?(stored: Any) {
-        // 이전 오버레이의 단일 창 설정도 같은 키에서 그대로 읽는다.
+        // 이전 메뉴바와 오버레이의 단일 창 설정도 같은 키에서 그대로 읽는다.
         if let raw = stored as? String, let old = WindowChoice(rawValue: raw) {
             if let label = old.label { self = .selected([label]) }
             else { self = old == .all ? .all : .tightest }

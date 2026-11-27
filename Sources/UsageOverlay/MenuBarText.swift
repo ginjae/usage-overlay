@@ -54,7 +54,7 @@ enum MenuBarText {
     private static var settings: Settings { .shared }
 
     static func parts(for snapshot: Snapshot, now: Date) -> [MenuBarPart] {
-        let parts = settings.providerOrder.providers
+        let parts = settings.enabledProviders
             .filter { settings[keyPath: $0.menuBarShown] }
             .flatMap { provider($0, usage: $0.usage(in: snapshot), now: now) }
         // 둘 다 끄면 아무것도 안 그려져 상세 창을 열 수 없다. 최소한의 손잡이는 남긴다.
@@ -63,16 +63,18 @@ enum MenuBarText {
 
     /// 메뉴바에 다 못 담는 값을 마우스를 올렸을 때 전부 보여 준다. 여기서는 메뉴바 설정과 무관하게 항상 전체를.
     static func tooltip(for snapshot: Snapshot, now: Date) -> String? {
-        let blocks = settings.providerOrder.providers.compactMap { $0.usage(in: snapshot) }.map { usage in
+        let blocks = settings.enabledProviders.compactMap { $0.usage(in: snapshot) }.map { usage in
             ([header(usage, now: now)] + rows(usage, now: now)).joined(separator: "\n")
         }
         return blocks.isEmpty ? nil : blocks.joined(separator: "\n")
     }
 
     private static func provider(_ provider: Provider, usage: ProviderUsage?, now: Date) -> [MenuBarPart] {
+        let selection = settings[keyPath: provider.menuBarWindow]
+        if case .selected(let labels) = selection, labels.isEmpty { return [] }
         let face = settings.menuBarReset.face
         let badge: NSImage? = settings.menuBarIcon || face != nil ? provider.icon : nil
-        let gauges = usage.map { settings[keyPath: provider.menuBarWindow].pick(from: $0.gauges) } ?? []
+        let gauges = selection.pick(from: usage?.gauges ?? [])
         guard !gauges.isEmpty else { return [MenuBarPart(icon: badge, text: "–")] }
         // 리셋 시각을 글자로 붙이면 조각 안이 이미 "39% · 2h 10m" 이라 가운뎃점을 또 찍지 않는다.
         let joint: MenuBarSeam = settings.menuBarReset == .countdown && settings.menuBarSeparator == .dot

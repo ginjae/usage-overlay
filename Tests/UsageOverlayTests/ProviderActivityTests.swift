@@ -19,7 +19,9 @@ final class ProviderActivityTests: XCTestCase {
 
     private func configure(_ extra: [String: Any] = [:]) {
         let defaults: [String: Any] = [
+            "providers.claude": true, "providers.codex": true,
             "menuBarClaude": false, "menuBarCodex": false,
+            "menuBar.claude.window": "all", "menuBar.codex.window": "all",
             "details.claude": false, "details.codex": false,
             "details.codexResets": false,
             "overlayClaude": true, "overlayCodex": true, "overlayVisible": false,
@@ -37,6 +39,37 @@ final class ProviderActivityTests: XCTestCase {
         configure(["menuBarClaude": true, "details.codex": true])
         XCTAssertTrue(Settings.shared.reads(.claude))
         XCTAssertTrue(Settings.shared.reads(.codex))
+    }
+
+    func testGlobalSwitchesOverrideSurfaceVisibilityAndCodexStatus() {
+        var preferences: [String: Any] = [
+            "menuBarClaude": true, "menuBarCodex": true, "details.claude": true, "details.codex": true,
+            "overlayVisible": true, "details.codexResets": true, "providers.codex": false,
+        ]
+        let snapshot = Snapshot(claude: ProviderUsage(name: "Claude", gauges: []),
+                                codex: ProviderUsage(name: "Codex", gauges: []))
+        let now = Date()
+
+        configure(preferences)
+        XCTAssertEqual(Settings.shared.enabledProviders, [.claude])
+        XCTAssertTrue(UsageStore.Configuration.preferences.claude)
+        XCTAssertFalse(UsageStore.Configuration.preferences.codex)
+        XCTAssertFalse(UsageStore.Configuration.preferences.codexResets)
+        XCTAssertEqual(MenuBarText.parts(for: snapshot, now: now).count, 1)
+        XCTAssertFalse(MenuBarText.tooltip(for: snapshot, now: now)?.contains("Codex") == true)
+
+        preferences["providers.claude"] = false
+        configure(preferences)
+        XCTAssertFalse(UsageStore.Configuration.preferences.hasSources)
+        XCTAssertEqual(MenuBarText.parts(for: snapshot, now: now).map(\.text), ["Usage"])
+        XCTAssertNil(MenuBarText.tooltip(for: snapshot, now: now))
+
+        preferences["providers.codex"] = true
+        configure(preferences)
+        XCTAssertEqual(Settings.shared.enabledProviders, [.codex])
+        XCTAssertFalse(UsageStore.Configuration.preferences.claude)
+        XCTAssertTrue(UsageStore.Configuration.preferences.codex)
+        XCTAssertTrue(UsageStore.Configuration.preferences.codexResets)
     }
 
     func testShowingOverlayStartsQueryAndHidingClearsIt() {

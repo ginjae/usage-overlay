@@ -169,11 +169,11 @@ struct SettingsView: View {
         private var keywords: String {
             switch self {
             case .general:
-                return "launch at login startup refresh every interval providers order command-line tools cli path claude codex"
+                return "launch at login startup refresh every interval providers enable disable order command-line tools cli path claude codex"
             case .updates:
                 return "software update version installed release notes check now automatically download install"
             case .menuBar:
-                return "preview providers windows text show percent left used window label percent sign between windows separator reset time countdown logo clock ring lit unlit logo size font weight fixed-width digits color spacing hover tooltip"
+                return "preview providers windows selected text show percent left used window label percent sign between windows separator reset time countdown logo clock ring lit unlit logo size font weight fixed-width digits color spacing hover tooltip"
             case .details:
                 return "menu preview providers windows selected percent left used plan bar time to reset reset time pace last updated width experimental codex reset status announcements scheduled watch forecasts"
             case .overlay:
@@ -522,12 +522,17 @@ struct ColorRow: View {
     }
 }
 
-/// 공급자 켜고 끄기. 메뉴바에서는 단일 창 선택도 붙인다.
-struct ProviderRows: View {
+/// 화면마다 공급자와 표시할 창을 고른다.
+struct ProviderWindowRows: View {
     @ObservedObject var settings = Settings.shared
     let provider: Provider
     let shown: ReferenceWritableKeyPath<Settings, Bool>
-    var window: ReferenceWritableKeyPath<Settings, WindowChoice>?
+    let window: ReferenceWritableKeyPath<Settings, WindowSelection>
+    let gauges: [Gauge]
+
+    private var selection: WindowSelection { settings[keyPath: window] }
+    private var labels: [String] { provider.windowLabels(from: gauges, selection: selection) }
+    private var checkedLabels: Set<String> { selection.checkedLabels(in: labels, gauges: gauges) }
 
     var body: some View {
         Toggle(isOn: $settings[dynamicMember: shown]) {
@@ -538,60 +543,52 @@ struct ProviderRows: View {
                     .interpolation(.high)
                     .frame(width: 13, height: 13)
                     .foregroundStyle(settings[keyPath: provider.accent].color)
-                Text(provider.name)
+                Text(provider.name).fontWeight(.medium)
             }
         }
-        if let window {
-            ChoiceRow(title: "\(provider.name) windows", selection: $settings[dynamicMember: window],
-                      choices: provider.windowChoices, label: \.title)
-                .disabled(!settings[keyPath: shown])
-        }
-    }
-}
+        .toggleStyle(.switch)
 
-/// 상세 창과 오버레이에서 공급자별로 여러 창을 켜고 끈다.
-struct ProviderWindowRows: View {
-    @ObservedObject var settings = Settings.shared
-    let provider: Provider
-    let shown: ReferenceWritableKeyPath<Settings, Bool>
-    let window: ReferenceWritableKeyPath<Settings, WindowSelection>
-    let gauges: [Gauge]
-
-    private var selection: WindowSelection { settings[keyPath: window] }
-    private var labels: [String] { provider.windowLabels(from: gauges, selection: selection) }
-
-    var body: some View {
-        ProviderRows(provider: provider, shown: shown)
-        Group {
-            ChoiceRow(title: "\(provider.name) windows", selection: Binding(
-                get: { selection.mode },
-                set: { mode in
-                    switch mode {
-                    case .all: settings[keyPath: window] = .all
-                    case .tightest: settings[keyPath: window] = .tightest
-                    case .selected:
-                        if selection.mode != .selected {
-                            settings[keyPath: window] = .selected(Set(labels))
-                        }
-                    }
-                }), choices: WindowSelection.Mode.allCases, label: \.title)
-            if selection.mode == .selected {
-                // Form은 중첩된 행을 펼친다. 이름만 ID로 쓰면 Codex 행이 Claude의
-                // 바인딩을 재사용하므로 화면·공급자를 가리키는 설정 키 경로도 포함한다.
-                ForEach(labels.map { WindowToggleID(preference: window, label: $0) }, id: \.self) { row in
-                    let label = row.label
-                    Toggle(label, isOn: Binding(
-                        get: { selection.selectedLabels.contains(label) },
-                        set: { enabled in
-                            var selected = selection.selectedLabels
-                            if enabled { selected.insert(label) } else { selected.remove(label) }
-                            settings[keyPath: window] = .selected(selected)
-                        }))
-                        .accessibilityLabel("\(provider.name) \(label)")
+        LabeledContent("Windows") {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 14) { windowOptions }
+                    .fixedSize(horizontal: true, vertical: false)
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 86), spacing: 10, alignment: .leading)],
+                          alignment: .trailing, spacing: 6) {
+                    windowOptions
                 }
             }
+            .toggleStyle(.checkbox)
         }
+        .contentShape(Rectangle())
+        .contextMenu { windowModePicker }
         .disabled(!settings[keyPath: shown])
+    }
+
+    private var windowOptions: some View {
+        ForEach(labels.map { WindowToggleID(preference: window, label: $0) }, id: \.self) { row in
+            let label = row.label
+            Toggle(isOn: Binding(
+                get: { checkedLabels.contains(label) },
+                set: { settings[keyPath: window] = selection.setting(label, checked: $0, in: labels, gauges: gauges) }
+            )) {
+                Text(label).fixedSize(horizontal: false, vertical: true)
+            }
+            .accessibilityLabel("\(provider.name) \(label)")
+        }
+    }
+
+    private var windowModePicker: some View {
+        ChoiceRow(title: "Window mode", selection: Binding(
+            get: { selection.mode },
+            set: { mode in
+                switch mode {
+                case .all: settings[keyPath: window] = .all
+                case .tightest: settings[keyPath: window] = .tightest
+                case .selected: settings[keyPath: window] = .selected(checkedLabels)
+                }
+            }), choices: WindowSelection.Mode.allCases, label: \.title)
+            .pickerStyle(.inline)
+            .labelsHidden()
     }
 }
 
