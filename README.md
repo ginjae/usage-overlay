@@ -4,7 +4,7 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/overlay-dark.png">
-  <img src="docs/overlay.png" width="300" alt="The floating overlay showing how much of each Claude and Codex rate-limit window is left and when it resets.">
+  <img src="docs/overlay.png" width="244" alt="The floating overlay showing Claude and Codex usage bars, percentages left, and time until reset.">
 </picture>
 
 ## Overview
@@ -54,14 +54,14 @@ It refreshes every 5 minutes (**Settings → General**) and pauses while the Mac
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/menubar-dark.png">
-  <img src="docs/menubar.png" width="142" alt="The menu bar item on light and dark menu bars: Claude's logo clock with 62% and 43% left, and Codex's with 86% left.">
+  <img src="docs/menubar.png" width="196" alt="Menu bar previews showing logo clocks and the remaining percentages for Claude and Codex.">
 </picture>
 
 By default the menu bar shows every window for each provider. In **Settings → Menu Bar** you can check individual windows or choose **Tightest** to show the window with the least left. You can also add labels such as `5h 39%` or switch to **Percent Used**.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/details-dark.png">
-  <img src="docs/details.png" width="356" alt="The details menu: Refresh Now, last updated time, Claude's 5-hour and Weekly windows and Codex's Weekly window with bars and reset times, Codex reset status, then the app's commands.">
+  <img src="docs/details.png" width="320" alt="The Details settings preview, showing plan names, 5-hour and weekly usage bars, and reset times for Claude and Codex.">
 </picture>
 
 Click the menu bar item for the details menu. It lists each window's time to reset and the weekday and time it resets. Turn on **Pace** in **Settings → Details** to see whether your current rate will use up a window before it resets. Codex plans **Pro 100**, **Pro 200**, and **Pro 500** are the [ChatGPT Pro tiers](https://learn.chatgpt.com/docs/pricing) at $100, $200, and $500 a month.
@@ -74,7 +74,7 @@ The overlay starts hidden and shows **5-hour** and **Weekly** for each provider.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/settings-dark.png">
-  <img src="docs/settings.png" width="720" alt="The Settings window laid out like System Settings, showing the Menu Bar pane with its preview and provider options.">
+  <img src="docs/settings.png" width="720" alt="The General settings pane with startup, refresh interval, provider switches, and provider order.">
 </picture>
 
 Settings is laid out like System Settings. Search the sidebar to find the pane for any setting, and press ⌘[ and ⌘] to go back and forward. Changes apply right away, and every pane except **Updates** has its own **Restore Defaults**.

@@ -1,24 +1,12 @@
 # Screenshots
 
-Captured on November 8, 2026 (Asia/Seoul) from **Usage Overlay 1.3.0, local build 102**, built with the macOS 27.2 SDK and running on macOS 27.0.1. The details menu was captured again on November 16, 2026 from the source after 1.4.0 that adds **Check for Updates…** to the menu, running on macOS 27.2.1.
+Captured on November 28, 2026 (Asia/Seoul) from the **Usage Overlay 1.6.1** interface on macOS 27.2.1. The app ran in a separate preferences domain with sample Claude and Codex usage. Each view was captured in light and dark appearances.
 
-- The app ran unmodified with default settings and fresh preferences, with the overlay shown.
-- Usage values are sample data. **Settings → General → Command-line tools** pointed at two stand-in scripts that answer like the `claude` and `codex` CLIs, with reset times a few hours to days away so each logo clock is clearly lit.
-- Each image has a light and a `-dark` version, captured with the app's appearance set to light or dark.
-- The overlay and the details menu were captured over a plain gradient backdrop, with 28 pt of backdrop on every side. Their glass shows that backdrop instead of a desktop, and their native shadows are included. The overlay was captured with `screencapture`.
-- The details menu is the menu bar item's menu, opened in the middle of the screen so it has the same margin on every side.
-- The details menu came from a capture build: the app's own sources with a different entry point and a separate preferences domain, so it starts from defaults without touching the installed app's settings. It opens the menu and captures only its own windows with ScreenCaptureKit, which needs no Screen Recording permission. The overlay was hidden, as it is by default.
-- Codex reset status in the details menu is the live public feed from codex-resets.com at capture time, not sample data.
-- `menubar.png` and `menubar-dark.png` are cropped from **Settings → Menu Bar → Preview**, which draws the menu bar item on a light and a dark menu bar.
-- `settings.png` and `settings-dark.png` are the Settings window with its shadow, sized to end after the Providers section.
-
-| File | Content | Native size |
+| File | Content | Size |
 |---|---|---|
-| [overlay.png](overlay.png), [overlay-dark.png](overlay-dark.png) | Floating overlay with Claude and Codex usage | 600 × 388 |
-| [menubar.png](menubar.png), [menubar-dark.png](menubar-dark.png) | Menu bar item with logo clocks and what's left | 284 × 120 |
-| [details.png](details.png), [details-dark.png](details-dark.png) | Details menu with each window's bar and reset times, Codex reset status, then the app's commands | 712 × 1218 |
-| [settings.png](settings.png), [settings-dark.png](settings-dark.png) | Settings window on the Menu Bar pane | 1744 × 1460 |
+| [overlay.png](overlay.png), [overlay-dark.png](overlay-dark.png) | The app’s floating overlay with both providers visible | 488 × 312 |
+| [menubar.png](menubar.png), [menubar-dark.png](menubar-dark.png) | The two menu bar strips from **Settings → Menu Bar → Preview** | 392 × 140 |
+| [details.png](details.png), [details-dark.png](details-dark.png) | The usage panel from **Settings → Details → Preview**, which uses the same view as the details menu | 640 × 670 |
+| [settings.png](settings.png), [settings-dark.png](settings-dark.png) | **Settings → General**, including the provider switches and order | 1640 × 1390 |
 
-[icon.png](icon.png) is the app icon, `Resources/AppIcon.png` scaled to 256 × 256.
-
-The main README shows these at half their pixel size for Retina sharpness, except the Settings window, which is shown smaller. Capture the app again after changing the interface, and update this page with the images.
+[icon.png](icon.png) is the app icon, scaled to 256 × 256.
