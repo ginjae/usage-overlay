@@ -156,13 +156,16 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
+mkdir -p "$APP/Contents/Resources"
+cp LICENSE "$APP/Contents/Resources/"
+
 # 1024px 마스터로 아이콘 세트를 만든다. 작은 칸(16 · 32pt)은 작은 크기용 그림이 있으면 그걸 쓴다.
 # 아이콘이 없어도 앱은 돌아가므로 여기서 빌드를 세우지는 않는다.
 if [[ -f "$ICON_SRC" ]] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
   ICON_WORK="$(mktemp -d)"
   trap 'rm -rf "$ICON_WORK"' EXIT
   ICONSET="$ICON_WORK/AppIcon.iconset"
-  mkdir -p "$ICONSET" "$APP/Contents/Resources"
+  mkdir -p "$ICONSET"
   while read -r size name small; do
     [[ -n "$size" ]] || continue
     source="$ICON_SRC"

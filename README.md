@@ -123,3 +123,7 @@ swift test
 Set `APP_VERSION` and `BUILD_NUMBER` for the bundle's version (defaults: `0.1.0` and `1`; with `--install`, the latest release's version, so the app still offers the next release). The tests run against a small local CLI fixture and never query your accounts.
 
 [About the screenshots](docs/README.md)
+
+## License
+
+The project’s original code is available under the [MIT License](LICENSE). The Claude and Codex logos shown in the app, app icon, and screenshots belong to their respective owners.
